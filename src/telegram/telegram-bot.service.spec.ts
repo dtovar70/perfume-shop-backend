@@ -120,7 +120,7 @@ describe('TelegramBotService', () => {
         await eventually(() => expect(server.of('deleteWebhook').length).toBeGreaterThanOrEqual(2))
         await eventually(() => expect(service.status().connected).toBe(true))
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('409 Conflict'))
-        expect(service.status()).toMatchObject({ username: 'manada_test_bot', mode: 'polling' })
+        expect(service.status()).toMatchObject({ username: 'kaizen_test_bot', mode: 'polling' })
         expect(server.of('setMyCommands')).not.toHaveLength(0)
 
         await service.onApplicationShutdown()
@@ -143,7 +143,7 @@ describe('TelegramBotService', () => {
                           id: 42,
                           is_bot: true,
                           first_name: 'Bot',
-                          username: 'manada_test_bot',
+                          username: 'kaizen_test_bot',
                       },
                   }
         })

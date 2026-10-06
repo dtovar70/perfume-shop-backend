@@ -15,12 +15,12 @@ export interface StoredFile {
     publicId: string
 }
 
-/** Folders of the public area: product photos and the categories' design template photos. */
-export const PUBLIC_FOLDERS = ['products', 'design-templates'] as const
+/** Folders of the public area: product photos and brand logos. */
+export const PUBLIC_FOLDERS = ['products', 'brands'] as const
 export type PublicFolder = (typeof PUBLIC_FOLDERS)[number]
 
 /** Folders of the private area. Each one is a fixed, known prefix of the stored keys. */
-export const PRIVATE_FOLDERS = ['payment-proofs', 'designs'] as const
+export const PRIVATE_FOLDERS = ['payment-proofs'] as const
 export type PrivateFolder = (typeof PRIVATE_FOLDERS)[number]
 
 export interface StoredPrivateFile {

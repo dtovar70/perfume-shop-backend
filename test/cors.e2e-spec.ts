@@ -6,7 +6,7 @@ import { AppModule } from '../src/app.module.js'
 import { corsOptions } from '../src/config/cors.js'
 import { FakeDb } from './fixtures/fake-orders-db.js'
 
-const STOREFRONT = 'https://manadarusso.com'
+const STOREFRONT = 'https://kaizen.com'
 
 /** The storefront lives on another origin: its checkout request needs a CORS preflight. */
 describe('CORS (e2e)', () => {

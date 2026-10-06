@@ -3,13 +3,13 @@ import { TEXT_INPUT_MAX_LENGTH } from '../common/validation/text-limits.js'
 
 /**
  * Topics of the contact form, with the labels the storefront shows. Mirrored by
- * frontend-cups/src/views/contact/schema/contact.schema.ts.
+ * the storefront's src/views/contact/schema/contact.schema.ts.
  */
-export const CONTACT_TOPICS = ['personalizado', 'mayoreo', 'pedido', 'otro'] as const
+export const CONTACT_TOPICS = ['asesoria', 'mayoreo', 'pedido', 'otro'] as const
 export type ContactTopic = (typeof CONTACT_TOPICS)[number]
 
 export const CONTACT_TOPIC_LABELS: Record<ContactTopic, string> = {
-    personalizado: 'Quiero un diseño personalizado',
+    asesoria: 'Quiero asesoría para elegir un perfume',
     mayoreo: 'Pedido por mayor',
     pedido: 'Consulta sobre un pedido',
     otro: 'Otro tema',

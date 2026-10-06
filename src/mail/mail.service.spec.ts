@@ -15,7 +15,7 @@ describe('MailService', () => {
         }
         const mail = new MailService(transport)
         expect(mail.delivers).toBe(true)
-        await expect(mail.send(MESSAGE, 'order received MR-000001')).resolves.toBe(true)
+        await expect(mail.send(MESSAGE, 'order received KZ-000001')).resolves.toBe(true)
         expect(transport.send).toHaveBeenCalledWith(MESSAGE)
     })
 
@@ -27,9 +27,9 @@ describe('MailService', () => {
             send: vi.fn().mockRejectedValue(new Error('550 ana@example.com: mailbox unavailable')),
         }
         const mail = new MailService(transport)
-        await expect(mail.send(MESSAGE, 'order received MR-000001')).resolves.toBe(false)
+        await expect(mail.send(MESSAGE, 'order received KZ-000001')).resolves.toBe(false)
         const logged = String(errors.mock.calls[0]?.[0])
-        expect(logged).toContain('order received MR-000001')
+        expect(logged).toContain('order received KZ-000001')
         expect(logged).toContain('[email]')
         expect(logged).not.toContain('ana@example.com')
     })

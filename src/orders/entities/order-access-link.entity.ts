@@ -13,7 +13,7 @@ import { User } from '../../auth/entities/user.entity.js'
 import { Order } from './order.entity.js'
 
 /**
- * One private link to the customer's order page (`/pedido/MR-000123?t=<token>`). Checkout creates
+ * One private link to the customer's order page (`/pedido/KZ-000123?t=<token>`). Checkout creates
  * the first one; the admin issues more (e.g. for a WhatsApp message), because the token itself is
  * never stored and so an old link cannot be rebuilt. Only the SHA-256 (hex) of each token is
  * kept. Every link that is not revoked opens the order.

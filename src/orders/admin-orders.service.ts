@@ -273,7 +273,7 @@ export class AdminOrdersService {
         const order = await this.dataSource.getRepository(Order).findOne({
             where: { code },
             relations: {
-                items: { design: { assets: true } },
+                items: true,
                 payments: { reviewedBy: true, recordedBy: true },
                 history: { actorUser: true },
                 adminNotes: { author: true },

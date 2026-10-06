@@ -20,7 +20,7 @@ const trimUpper = ({ value }: TransformFnParams): unknown =>
 export class OrderLookupDto {
     @Transform(trimUpper)
     @IsString({ message: msg.text(FIELD.code) })
-    @Matches(ORDER_CODE_PATTERN, { message: msg.format(FIELD.code, 'MR-000123') })
+    @Matches(ORDER_CODE_PATTERN, { message: msg.format(FIELD.code, 'KZ-000123') })
     code: string
 
     @Transform(trim)

@@ -3,7 +3,6 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 import { OrderStatusCatalogService } from '../../catalogs/order-status-catalog.service.js'
 import { ContentService } from '../../content/content.service.js'
-import { designTextsSummary } from '../../designs/design-layers.js'
 import { RATE_SOURCE_LABELS } from '../../exchange-rate/providers/rate-provider.js'
 import { Order } from '../entities/order.entity.js'
 import { OrderAccessService } from '../order-access.service.js'
@@ -80,7 +79,7 @@ export class ReceiptService {
     ): Promise<ReceiptFile> {
         const order = await this.dataSource.getRepository(Order).findOne({
             where: { code },
-            relations: { items: { design: true }, payments: true },
+            relations: { items: true, payments: true },
         })
         if (!order) throw new NotFoundException(ORDER_NOT_FOUND)
         const payments = order.payments ?? []
@@ -112,7 +111,7 @@ export class ReceiptService {
             },
             delivery:
                 order.deliveryMethod === 'pickup'
-                    ? { method: 'Retiro en el taller', address: content.contact.city }
+                    ? { method: 'Retiro en tienda', address: content.contact.city }
                     : {
                           method: 'Envío a domicilio',
                           address: [order.address, order.city].filter(Boolean).join(', '),
@@ -122,10 +121,6 @@ export class ReceiptService {
                 .map((item) => ({
                     name: item.productName,
                     variant: item.variantLabel,
-                    personalization: item.personalization,
-                    hasDesign: Boolean(item.designId),
-                    designColor: item.design?.colorName ?? null,
-                    designTexts: designTextsSummary(item.design?.layers),
                     quantity: item.quantity,
                     unitUsd: item.unitPriceUsd,
                     totalUsd: item.lineTotalUsd,

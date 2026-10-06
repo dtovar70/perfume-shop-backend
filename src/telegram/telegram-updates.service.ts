@@ -61,10 +61,10 @@ interface PendingReason {
     expiresAt: number
 }
 
-/** "MR-000012", "mr-12", "12" -> "MR-000012"; null when it is not an order code. */
+/** "KZ-000012", "kz-12", "12" -> "KZ-000012"; null when it is not an order code. */
 export function normalizeOrderCode(value: string): string | null {
-    const match = /^(?:MR-?)?(\d{1,9})$/i.exec(value.trim())
-    return match ? `MR-${(match[1] as string).padStart(6, '0')}` : null
+    const match = /^(?:KZ-?)?(\d{1,9})$/i.exec(value.trim())
+    return match ? `KZ-${(match[1] as string).padStart(6, '0')}` : null
 }
 
 /** How the owner is named in the messages: Telegram first name, @username or the admin. */
@@ -195,7 +195,7 @@ export class TelegramUpdatesService implements OnModuleInit {
     private async refuse(ctx: Context): Promise<void> {
         if (ctx.callbackQuery) {
             await ctx.answerCallbackQuery({
-                text: '🔒 Este bot es privado del equipo de Manada Russo.',
+                text: '🔒 Este bot es privado del equipo de KaiZen.',
                 show_alert: true,
             })
             return
@@ -234,7 +234,7 @@ export class TelegramUpdatesService implements OnModuleInit {
             }
         }
         if (chat) {
-            await ctx.reply(`Este chat ya está vinculado 🐾\n\n${HELP_TEXT}`, {
+            await ctx.reply(`Este chat ya está vinculado ✨\n\n${HELP_TEXT}`, {
                 parse_mode: 'HTML',
             })
             return
@@ -272,12 +272,12 @@ export class TelegramUpdatesService implements OnModuleInit {
     private async onOrder(ctx: Context, chat: TelegramChat, args: string): Promise<void> {
         const code = normalizeOrderCode(args)
         if (!code) {
-            await ctx.reply('Escríbeme el código del pedido, por ejemplo: /pedido MR-000012')
+            await ctx.reply('Escríbeme el código del pedido, por ejemplo: /pedido KZ-000012')
             return
         }
         const order = await this.dataSource
             .getRepository(Order)
-            .findOne({ where: { code }, relations: { items: { design: true }, payments: true } })
+            .findOne({ where: { code }, relations: { items: true, payments: true } })
         if (!order) {
             await ctx.reply(`No encontré el pedido ${code} 🤔`)
             return

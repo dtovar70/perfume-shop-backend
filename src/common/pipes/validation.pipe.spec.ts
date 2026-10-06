@@ -13,11 +13,9 @@ interface FieldError {
 }
 
 const VALID_PRODUCT = {
-    name: 'Taza de prueba',
-    categorySlug: 'tazas',
+    name: 'Perfume de prueba',
+    categorySlug: 'arabes',
     price: 10,
-    printText: 'Hola',
-    colorHex: '#FFFFFF',
     description: 'Descripción',
     stock: 3,
 }
@@ -71,12 +69,12 @@ describe('createValidationPipe', () => {
         const details = await detailsFor(
             {
                 ...VALID_PRODUCT,
-                sku: 'X',
+                barcode: 'X',
                 variants: [{ label: 'A', priceDelta: 0, stock: 1, foo: 1 }],
             },
             CreateProductDto,
         )
-        expect(errorsOf(details, 'sku')).toEqual(['El campo "sku" no está permitido.'])
+        expect(errorsOf(details, 'barcode')).toEqual(['El campo "barcode" no está permitido.'])
         expect(errorsOf(details, 'variants.0.foo')).toEqual(['El campo "foo" no está permitido.'])
     })
 
@@ -93,7 +91,7 @@ describe('createValidationPipe', () => {
 
     it('validates new categories in Spanish', async () => {
         const details = await detailsFor(
-            { name: '', slug: 'Tazas Grandes', colorHex: 'rosa', sortOrder: -1 },
+            { name: '', slug: 'Perfumes Grandes', colorHex: 'rosa', sortOrder: -1 },
             CreateCategoryDto,
         )
         expect(errorsOf(details, 'name')).toEqual(['El nombre de la categoría es obligatorio.'])

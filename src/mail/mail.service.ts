@@ -32,7 +32,7 @@ export class MailService implements OnApplicationBootstrap {
     }
 
     /**
-     * `context` names what is sent for the log ("order received MR-000123"); it must not carry
+     * `context` names what is sent for the log ("order received KZ-000123"); it must not carry
      * personal data. Resolves true once the provider accepted the message.
      */
     async send(message: OutgoingMail, context: string): Promise<boolean> {

@@ -33,7 +33,7 @@ export class OrderEmailsService {
         if (!this.enabled) return false
         const order = await this.dataSource
             .getRepository(Order)
-            .findOne({ where: { id: orderId }, relations: { items: { design: true } } })
+            .findOne({ where: { id: orderId }, relations: { items: true } })
         if (!order) {
             this.logger.warn(`Order ${orderId} not found; no "order received" email`)
             return false

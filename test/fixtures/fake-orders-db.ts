@@ -1,12 +1,9 @@
 import { FindOperator, QueryFailedError } from 'typeorm'
 import { User } from '../../src/auth/entities/user.entity.js'
 import { Role } from '../../src/auth/role.enum.js'
-import { CategoryDesignTemplate } from '../../src/categories/entities/category-design-template.entity.js'
 import { Category } from '../../src/categories/entities/category.entity.js'
 import { caracasDay } from '../../src/common/utils/caracas-date.js'
 import { SiteContentEntry } from '../../src/content/entities/site-content.entity.js'
-import { DesignAsset } from '../../src/designs/entities/design-asset.entity.js'
-import { Design } from '../../src/designs/entities/design.entity.js'
 import { ExchangeRate } from '../../src/exchange-rate/entities/exchange-rate.entity.js'
 import { OrderAccessLink } from '../../src/orders/entities/order-access-link.entity.js'
 import { OrderItem } from '../../src/orders/entities/order-item.entity.js'
@@ -31,7 +28,7 @@ export const PAGO_MOVIL = {
     bankName: 'Banesco',
     phone: '0412-5550134',
     idNumber: 'V-12345678',
-    holderName: 'Manada Russo',
+    holderName: 'KaiZen C.A.',
     instructions: '',
 }
 
@@ -64,7 +61,6 @@ export class FakeDb {
     private transactionQueue: Promise<unknown> = Promise.resolve()
     tables = new Map<unknown, Row[]>([
         [Category, []],
-        [CategoryDesignTemplate, []],
         [Product, []],
         [ProductVariant, []],
         [ProductImage, []],
@@ -76,43 +72,38 @@ export class FakeDb {
         [OrderAccessLink, []],
         [ExchangeRate, []],
         [SiteContentEntry, []],
-        [Design, []],
-        [DesignAsset, []],
     ])
 
     constructor() {
-        // As after the CategoryDesignTemplates migrations: print sizes, no template photos.
-        const category = (slug: string, widthCm: number | null, heightCm: number | null) => ({
+        const category = (slug: string) => ({
             slug,
             name: slug,
             tagline: '',
             description: '',
             colorHex: '#FFD979',
             sortOrder: 0,
-            designPrintWidthCm: widthCm,
-            designPrintHeightCm: heightCm,
         })
         this.table(Category).push(
-            category('mugs', 20, 8.5),
-            category('tees', 25, 30),
-            category('keychains', 5, 5),
-            category('coolers', null, null),
+            category('mugs'),
+            category('tees'),
+            category('keychains'),
+            category('coolers'),
         )
         this.table(Product).push(
             {
                 id: 'mug-001',
                 slug: 'taza',
-                name: 'Taza Café Primero',
+                name: 'Lattafa Khamrah',
                 price: 12.9,
                 stock: 8,
                 isActive: true,
                 categorySlug: 'mugs',
-                tags: ['personalizable'],
+                tags: [],
             },
             {
                 id: 'tee-001',
                 slug: 'franela',
-                name: 'Franela',
+                name: 'Khamrah',
                 price: 20,
                 stock: 1,
                 isActive: true,
@@ -127,18 +118,18 @@ export class FakeDb {
                 stock: 9,
                 isActive: false,
                 categorySlug: 'mugs',
-                tags: ['personalizable'],
+                tags: [],
             },
             // No variants: the product row holds its own stock.
             {
                 id: 'key-001',
                 slug: 'llavero',
-                name: 'Llavero',
+                name: 'Asad',
                 price: 4,
                 stock: 3,
                 isActive: true,
                 categorySlug: 'keychains',
-                tags: ['personalizable'],
+                tags: [],
             },
         )
         // Stock per variant; `products.stock` is their sum (8 for the mug, 1 for the tee).
@@ -241,17 +232,9 @@ export class FakeDb {
                     for (const product of this.table(Product)) {
                         const slug = product.categorySlug as string
                         if (params.slug && params.slug !== slug) continue
-                        const row = counts.get(slug) ?? {
-                            slug,
-                            active: 0,
-                            total: 0,
-                            personalizable: 0,
-                        }
+                        const row = counts.get(slug) ?? { slug, active: 0, total: 0 }
                         row.total = (row.total as number) + 1
                         if (product.isActive) row.active = (row.active as number) + 1
-                        if ((product.tags as string[]).includes('personalizable')) {
-                            row.personalizable = (row.personalizable as number) + 1
-                        }
                         counts.set(slug, row)
                     }
                     return Promise.resolve([...counts.values()])
@@ -312,20 +295,7 @@ export class FakeDb {
         const of = (entity: unknown) => this.table(entity).filter((row) => row.orderId === order.id)
         return {
             ...order,
-            items: of(OrderItem).map((item) => {
-                const design = this.table(Design).find((row) => row.id === item.designId)
-                return {
-                    ...item,
-                    design: design
-                        ? {
-                              ...design,
-                              assets: this.table(DesignAsset).filter(
-                                  (asset) => asset.designId === design.id,
-                              ),
-                          }
-                        : null,
-                }
-            }),
+            items: of(OrderItem),
             payments: of(OrderPayment),
             history: of(OrderStatusHistory),
             adminNotes: of(OrderNote),
@@ -447,14 +417,7 @@ export class FakeDb {
                 const rows = this.table(entity)
                 const keep = rows.filter((row) => !matches(row, where))
                 const affected = rows.length - keep.length
-                const gone = rows.filter((row) => matches(row, where)).map((row) => row.id)
                 rows.splice(0, rows.length, ...keep)
-                if (entity === Design) {
-                    // design_assets.design_id is ON DELETE CASCADE.
-                    const assets = this.table(DesignAsset)
-                    const kept = assets.filter((asset) => !gone.includes(asset.designId))
-                    assets.splice(0, assets.length, ...kept)
-                }
                 return Promise.resolve({ affected })
             },
             createQueryBuilder: () => this.queryBuilder(entity),

@@ -1,7 +1,7 @@
 /**
  * Editable site content: one JSON value per section, stored in `site_content`.
  *
- * Mirrored in frontend-cups/src/@types/content.ts. Keep both files identical (only the
+ * Mirrored in frontend-perfume-shop/src/@types/content.ts. Keep both files identical (only the
  * comments that point at each other differ), so the storefront and the API agree on the shape.
  *
  * Text conventions shared by the API and the storefront:

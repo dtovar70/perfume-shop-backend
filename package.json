@@ -1,7 +1,7 @@
 {
-  "name": "backend-cups",
+  "name": "backend-kaizen",
   "version": "0.0.1",
-  "description": "Manada Russo Creativa API (NestJS + TypeORM + PostgreSQL)",
+  "description": "KaiZen Perfumería API",
   "author": "",
   "private": true,
   "license": "UNLICENSED",

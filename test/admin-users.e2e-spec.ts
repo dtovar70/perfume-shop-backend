@@ -90,7 +90,7 @@ describe('Admin users and own account (e2e)', () => {
 
     const http = () => request(app.getHttpServer())
 
-    /** Logs in and returns the `mr_session` cookie. */
+    /** Logs in and returns the `kz_session` cookie. */
     const login = async (email: string, password: string): Promise<string> => {
         const response = await http().post('/api/auth/login').send({ email, password }).expect(200)
         return sessionCookie(response.headers['set-cookie'])
@@ -98,7 +98,7 @@ describe('Admin users and own account (e2e)', () => {
 
     const sessionCookie = (header: unknown): string => {
         const cookies = ([] as string[]).concat((header as string[] | string | undefined) ?? [])
-        const session = cookies.find((cookie) => cookie.startsWith('mr_session='))
+        const session = cookies.find((cookie) => cookie.startsWith('kz_session='))
         if (!session) throw new Error('No session cookie')
         return session.split(';')[0] as string
     }

@@ -10,7 +10,7 @@ import { TelegramBotService } from './telegram-bot.service.js'
 import { TelegramPaymentsService } from './telegram-payments.service.js'
 
 export function passwordResetCodeMessage(code: string, ttlMinutes: number): string {
-    return `🔐 Código para restablecer tu contraseña de Manada Russo: <b>${code}</b>\nVence en ${ttlMinutes} minutos. Si no fuiste tú, ignora este mensaje y avísale a un administrador.`
+    return `🔐 Código para restablecer tu contraseña de KaiZen: <b>${code}</b>\nVence en ${ttlMinutes} minutos. Si no fuiste tú, ignora este mensaje y avísale a un administrador.`
 }
 
 export const PASSWORD_CHANGED_MESSAGE =

@@ -1,10 +1,8 @@
 import {
     contactMessage,
     contactWhatsAppGreeting,
-    designTextLine,
     escapeHtml,
     fitCaption,
-    garmentColorText,
     itemLines,
     formatCaracasDateTime,
     formatCaracasTime,
@@ -19,14 +17,13 @@ import {
 } from './telegram-format.js'
 
 const DATA: PaymentMessageData = {
-    code: 'MR-000012',
+    code: 'KZ-000012',
     customerName: 'Ana & <Co>',
     customerPhone: '0414-1234567',
     items: Array.from({ length: 8 }, (_, index) => ({
         quantity: index + 1,
-        productName: `Taza ${index}`,
-        variantLabel: index === 0 ? '15 oz' : null,
-        personalization: index === 0 ? 'Para <mamá>' : null,
+        productName: index === 0 ? 'Yara <Edición>' : `Perfume ${index}`,
+        variantLabel: index === 0 ? '100 ml' : null,
     })),
     totalUsd: 1234.5,
     totalBs: 1054853.41,
@@ -47,55 +44,24 @@ const DATA: PaymentMessageData = {
         recordedByName: null,
         hasProof: true,
     },
-    adminUrl: 'https://manadarusso.com/admin/pedidos/MR-000012',
+    adminUrl: 'https://kaizen.com/admin/pedidos/KZ-000012',
 }
 
 describe('telegram-format', () => {
     it('escapes HTML and truncates by characters', () => {
         expect(escapeHtml('<b>"A" & B</b>')).toBe('&lt;b&gt;&quot;A&quot; &amp; B&lt;/b&gt;')
         expect(truncate('  abcdef  ', 4)).toBe('abc…')
-        expect(truncate('🐾🐾🐾', 3)).toBe('🐾🐾🐾')
+        expect(truncate('✨✨✨', 3)).toBe('✨✨✨')
         expect(visibleLength('<b>a &amp; b</b>')).toBe(5)
     })
 
-    it('marks the lines with an own design', () => {
-        const [plain, designed, both] = itemLines([
-            { quantity: 1, productName: 'Taza', variantLabel: null, personalization: null },
-            {
-                quantity: 2,
-                productName: 'Franela',
-                variantLabel: 'M',
-                personalization: null,
-                designId: 'd1',
-            },
-            {
-                quantity: 1,
-                productName: 'Llavero',
-                variantLabel: null,
-                personalization: 'Luna',
-                designId: 'd2',
-            },
+    it('lists each line with its quantity and escaped variant', () => {
+        const [plain, sized] = itemLines([
+            { quantity: 1, productName: 'Khamrah', variantLabel: null },
+            { quantity: 2, productName: 'Sauvage', variantLabel: '<100 ml>' },
         ])
-        expect(plain).toBe('• 1 × Taza')
-        expect(designed).toBe('• 2 × Franela (M)\n   🎨 <b>Diseño propio</b>')
-        expect(both).toBe('• 1 × Llavero\n   🎨 <b>Diseño propio</b>\n   <i>“Luna”</i>')
-    })
-
-    it('names the garment color of a design', () => {
-        const [line] = itemLines([
-            {
-                quantity: 1,
-                productName: 'Franela',
-                variantLabel: 'M',
-                personalization: null,
-                designId: 'd1',
-                design: { colorName: 'Negro <b>', colorHex: '#1F2937' },
-            },
-        ])
-        expect(line).toBe(
-            '• 1 × Franela (M)\n   🎨 <b>Diseño propio</b>\n   🎨 Color: <b>Negro &lt;b&gt;</b>',
-        )
-        expect(garmentColorText({ name: 'Blanco', hex: '#FFFFFF' })).toBe('🎨 Color: <b>Blanco</b>')
+        expect(plain).toBe('• 1 × Khamrah')
+        expect(sized).toBe('• 2 × Sauvage (&lt;100 ml&gt;)')
     })
 
     it('formats Caracas dates and times', () => {
@@ -108,11 +74,11 @@ describe('telegram-format', () => {
 
     it('renders the payment with escaped customer text, money and capped items', () => {
         const text = paymentMessage(DATA)
-        expect(text).toContain('🧾 <b>Nuevo pago por verificar</b> · <b>MR-000012</b>')
+        expect(text).toContain('🧾 <b>Nuevo pago por verificar</b> · <b>KZ-000012</b>')
         expect(text).toContain('Ana &amp; &lt;Co&gt;')
-        expect(text).toContain('• 1 × Taza 0 (15 oz)\n   <i>“Para &lt;mamá&gt;”</i>')
+        expect(text).toContain('• 1 × Yara &lt;Edición&gt; (100 ml)')
         expect(text).toContain('…y 2 artículos más')
-        expect(text).not.toContain('Taza 6')
+        expect(text).not.toContain('Perfume 6')
         expect(text).toContain('$1.234,50 · Bs. 1.054.853,41')
         expect(text).toContain('Tasa BCV 854,46')
         expect(text).toContain('Banco de Venezuela (0102)')
@@ -130,7 +96,7 @@ describe('telegram-format', () => {
                 lines: [
                     {
                         productId: 'p',
-                        productName: 'Taza',
+                        productName: 'Yara',
                         requested: 3,
                         available: 1,
                         reserved: 1,
@@ -138,7 +104,7 @@ describe('telegram-format', () => {
                     {
                         productId: 'f',
                         variantId: 'f-m',
-                        productName: 'Franela',
+                        productName: 'Khamrah',
                         variantLabel: 'Talla M',
                         requested: 2,
                         available: 0,
@@ -160,7 +126,7 @@ describe('telegram-format', () => {
         expect(text).toContain('⚠️ <b>Referencia repetida')
         expect(text).toContain('⏰ <b>Pago fuera de plazo</b>')
         expect(text).toContain(
-            '📦 <b>Stock insuficiente:</b> «Taza» pidió 3, hay 1; «Franela – Talla M» pidió 2, hay 0',
+            '📦 <b>Stock insuficiente:</b> «Yara» pidió 3, hay 1; «Khamrah – Talla M» pidió 2, hay 0',
         )
         expect(text).toContain('Registrado manualmente en el panel por Dueña · sin captura')
     })
@@ -169,10 +135,7 @@ describe('telegram-format', () => {
         expect(paymentMessage(DATA, { resolution: '✅ Hecho' }).endsWith('\n\n✅ Hecho')).toBe(true)
     })
 
-    it('lists a design text and keeps captions within the limit', () => {
-        expect(
-            designTextLine({ content: 'Sofía\n<7>', fontLabel: 'Baloo 2', color: '#E75F9B' }),
-        ).toBe('🔤 Texto: «Sofía / &lt;7&gt;» · fuente Baloo 2 · color #E75F9B')
+    it('keeps captions within the limit', () => {
         expect(fitCaption(['a', 'b'], ['c'])).toBe('a\nb\nc')
         const long = 'x'.repeat(600)
         expect(fitCaption(['head'], [long, long])).toBe(`head\n${long}\n…`)
@@ -237,7 +200,7 @@ describe('contactMessage', () => {
         fullName: 'Ana & <Co>',
         email: 'ana@example.com',
         phone: '0414-1234567',
-        topic: 'personalizado' as const,
+        topic: 'asesoria' as const,
         message: 'Hola <b>equipo</b> & amigos',
         receivedAt: '2026-09-25T14:30:00.000Z',
     }
@@ -249,7 +212,7 @@ describe('contactMessage', () => {
             '👤 Ana &amp; &lt;Co&gt;',
             '✉️ ana@example.com',
             '📱 WhatsApp: 0414-1234567',
-            '🏷️ Quiero un diseño personalizado',
+            '🏷️ Quiero asesoría para elegir un perfume',
         ])
         expect(text).toContain('🗓️ 25/09/2026')
         expect(text.endsWith('Hola &lt;b&gt;equipo&lt;/b&gt; &amp; amigos')).toBe(true)

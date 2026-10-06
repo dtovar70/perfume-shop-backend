@@ -18,7 +18,6 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import type { Response } from 'express'
 import { Public } from '../common/decorators/public.decorator.js'
-import { sendPrivateFile } from '../designs/send-private-file.js'
 import { CreateOrderDto } from './dto/create-order.dto.js'
 import { OrderAccessQueryDto, OrderLookupDto } from './dto/order-access.dto.js'
 import { ORDER_LOOKUP_REQUESTED, OrderLookupService } from './emails/order-lookup.service.js'
@@ -95,17 +94,6 @@ export class OrdersController {
         @Res() res: Response,
     ): Promise<void> {
         sendReceipt(res, await this.receipts.forCustomer(code, query.t))
-    }
-
-    /** The preview of a line's own design ("Diseño propio"), for the order's private link. */
-    @Get(':code/designs/:designId/preview')
-    async designPreview(
-        @Param('code') code: string,
-        @Param('designId') designId: string,
-        @Query() query: OrderAccessQueryDto,
-        @Res() res: Response,
-    ): Promise<void> {
-        sendPrivateFile(res, await this.orders.designPreview(code, query.t, designId))
     }
 
     @Get(':code')

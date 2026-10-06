@@ -8,9 +8,10 @@ import {
 } from '@nestjs/common'
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
 import { DataSource, In, Repository, type EntityManager } from 'typeorm'
+import { Brand } from '../brands/entities/brand.entity.js'
 import { Category } from '../categories/entities/category.entity.js'
 import { slugify } from '../common/utils/text.util.js'
-import { isDbError, omitUndefined } from '../database/db-errors.js'
+import { dbConstraint, isDbError, omitUndefined } from '../database/db-errors.js'
 import { newId } from '../database/id.js'
 import { STORAGE_SERVICE, type StorageService } from '../storage/storage.service.js'
 import { buildSearchConditions, PRODUCT_ALIAS, type Condition } from './catalog-query.js'
@@ -45,7 +46,7 @@ function variantRows(
             productId,
             label: variant.label,
             priceDelta: variant.priceDelta,
-            colorHex: variant.colorHex ?? null,
+            volumeMl: variant.volumeMl ?? null,
             stock: variant.stock,
             sortOrder: index,
         }
@@ -67,6 +68,7 @@ export class AdminProductsService {
         @InjectDataSource() private readonly dataSource: DataSource,
         @InjectRepository(Product) private readonly products: Repository<Product>,
         @InjectRepository(Category) private readonly categories: Repository<Category>,
+        @InjectRepository(Brand) private readonly brands: Repository<Brand>,
         @InjectRepository(ProductImage) private readonly images: Repository<ProductImage>,
         private readonly productReader: ProductRepository,
         @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
@@ -105,11 +107,24 @@ export class AdminProductsService {
 
     async create(dto: CreateProductDto): Promise<AdminProductDto> {
         await this.assertCategoryExists(dto.categorySlug)
+        const brandName = await this.brandName(dto.brandSlug)
         const slug = dto.slug ?? slugify(dto.name)
         if (!slug) {
             throw new BadRequestException('No pudimos generar un slug a partir del nombre.')
         }
         const tags = dto.tags ?? []
+        const perfume = {
+            brandSlug: dto.brandSlug ?? null,
+            gender: dto.gender ?? 'unisex',
+            concentration: dto.concentration ?? null,
+            volumeMl: dto.volumeMl ?? null,
+            notesTop: dto.notesTop ?? [],
+            notesHeart: dto.notesHeart ?? [],
+            notesBase: dto.notesBase ?? [],
+            olfactoryFamily: dto.olfactoryFamily ?? null,
+            isFeatured: dto.isFeatured ?? false,
+            sku: dto.sku ?? null,
+        } satisfies Partial<Product>
         this.assertCompareAtPrice(dto.price, dto.compareAtPrice)
 
         const id = newId()
@@ -122,8 +137,7 @@ export class AdminProductsService {
                     categorySlug: dto.categorySlug,
                     price: dto.price,
                     compareAtPrice: dto.compareAtPrice ?? null,
-                    printText: dto.printText,
-                    colorHex: dto.colorHex,
+                    ...perfume,
                     description: dto.description,
                     highlights: dto.highlights ?? [],
                     tags,
@@ -131,13 +145,13 @@ export class AdminProductsService {
                     reviewCount: dto.reviewCount ?? 0,
                     stock: productStock(dto.variants, dto.stock),
                     isActive: dto.isActive ?? true,
-                    ...computeDerivedFields({ ...dto, tags }),
+                    ...computeDerivedFields({ ...dto, ...perfume, tags, brandName }),
                 })
                 const variants = variantRows(id, dto.variants ?? [])
                 if (variants.length) await manager.insert(ProductVariant, variants)
             })
         } catch (error) {
-            this.rethrowConstraintError(error, slug)
+            this.rethrowConstraintError(error, slug, perfume.sku)
         }
         return this.get(id)
     }
@@ -146,12 +160,23 @@ export class AdminProductsService {
         const current = await this.products.findOneBy({ id })
         if (!current) throw new NotFoundException(PRODUCT_NOT_FOUND)
         if (dto.categorySlug) await this.assertCategoryExists(dto.categorySlug)
+        const brandSlug = dto.brandSlug === undefined ? current.brandSlug : dto.brandSlug
+        const brandName = await this.brandName(brandSlug)
 
         const merged = {
             name: dto.name ?? current.name,
             description: dto.description ?? current.description,
-            printText: dto.printText ?? current.printText,
             tags: dto.tags ?? current.tags,
+            brandName,
+            gender: dto.gender ?? current.gender,
+            concentration:
+                dto.concentration === undefined ? current.concentration : dto.concentration,
+            olfactoryFamily:
+                dto.olfactoryFamily === undefined ? current.olfactoryFamily : dto.olfactoryFamily,
+            notesTop: dto.notesTop ?? current.notesTop,
+            notesHeart: dto.notesHeart ?? current.notesHeart,
+            notesBase: dto.notesBase ?? current.notesBase,
+            isFeatured: dto.isFeatured ?? current.isFeatured,
         }
         const price = dto.price ?? current.price
         const compareAtPrice =
@@ -175,7 +200,11 @@ export class AdminProductsService {
                 await syncProductStock(manager, [id])
             })
         } catch (error) {
-            this.rethrowConstraintError(error, dto.slug ?? current.slug)
+            this.rethrowConstraintError(
+                error,
+                dto.slug ?? current.slug,
+                dto.sku === undefined ? current.sku : dto.sku,
+            )
         }
         return this.get(id)
     }
@@ -245,6 +274,14 @@ export class AdminProductsService {
         }
     }
 
+    /** The brand's name for the search text (400 when the slug is unknown). */
+    private async brandName(slug: string | null | undefined): Promise<string | null> {
+        if (!slug) return null
+        const brand = await this.brands.findOne({ where: { slug }, select: { name: true } })
+        if (!brand) throw new BadRequestException(`La marca "${slug}" no existe.`)
+        return brand.name
+    }
+
     private assertCompareAtPrice(price: number, compareAtPrice?: number | null): void {
         if (compareAtPrice !== undefined && compareAtPrice !== null && compareAtPrice <= price) {
             throw new BadRequestException(
@@ -253,12 +290,19 @@ export class AdminProductsService {
         }
     }
 
-    private rethrowConstraintError(error: unknown, slug: string): never {
+    private rethrowConstraintError(error: unknown, slug: string, sku: string | null): never {
         if (isDbError(error, '23505')) {
+            if (sku && dbConstraint(error) === 'products_sku_key') {
+                throw new ConflictException(`Ya existe un producto con el SKU "${sku}".`)
+            }
             throw new ConflictException(`Ya existe un producto con el slug "${slug}".`)
         }
         if (isDbError(error, '23503')) {
-            throw new BadRequestException('La categoría indicada no existe.')
+            throw new BadRequestException(
+                dbConstraint(error) === 'products_brand_slug_fkey'
+                    ? 'La marca indicada no existe.'
+                    : 'La categoría indicada no existe.',
+            )
         }
         throw error
     }

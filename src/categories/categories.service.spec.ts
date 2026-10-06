@@ -7,7 +7,6 @@ import {
     CategoriesService,
     categoryInUseMessage,
 } from './categories.service.js'
-import type { CategoryDesignTemplate } from './entities/category-design-template.entity.js'
 import type { Category } from './entities/category.entity.js'
 
 function uniqueViolation(): QueryFailedError {
@@ -31,27 +30,25 @@ function setup(options: { exists?: boolean; productCount?: number; maxSortOrder?
     const products = {
         countBy: vi.fn().mockResolvedValue(options.productCount ?? 0),
     }
-    const templates = { find: vi.fn().mockResolvedValue([]) }
     const service = new CategoriesService(
         categories as unknown as Repository<Category>,
         products as unknown as Repository<Product>,
-        templates as unknown as Repository<CategoryDesignTemplate>,
     )
     return { service, categories, products }
 }
 
-const INPUT = { name: 'Gorras Bordadas', colorHex: '#FFD979' }
+const INPUT = { name: 'Perfumes Árabes', colorHex: '#FFD979' }
 
 describe('CategoriesService.create', () => {
     it('derives the slug from the name and appends the category at the end', async () => {
         const { service, categories } = setup({ maxSortOrder: 2 })
-        const created = await service.create({ ...INPUT, name: 'Gorras Bordadas Ñandú' })
+        const created = await service.create({ ...INPUT, name: 'Perfumes Árabes Ñandú' })
 
         expect(categories.insert).toHaveBeenCalledWith(
-            expect.objectContaining({ slug: 'gorras-bordadas-nandu', sortOrder: 3, tagline: '' }),
+            expect.objectContaining({ slug: 'perfumes-arabes-nandu', sortOrder: 3, tagline: '' }),
         )
         expect(created).toMatchObject({
-            slug: 'gorras-bordadas-nandu',
+            slug: 'perfumes-arabes-nandu',
             productCount: 0,
             totalProductCount: 0,
             sortOrder: 3,
@@ -66,16 +63,16 @@ describe('CategoriesService.create', () => {
         )
 
         const explicit = setup({ maxSortOrder: 5 })
-        await explicit.service.create({ ...INPUT, slug: 'gorras', sortOrder: 1 })
+        await explicit.service.create({ ...INPUT, slug: 'arabes', sortOrder: 1 })
         expect(explicit.categories.insert).toHaveBeenCalledWith(
-            expect.objectContaining({ slug: 'gorras', sortOrder: 1 }),
+            expect.objectContaining({ slug: 'arabes', sortOrder: 1 }),
         )
     })
 
     it('rejects a slug that is already taken with a Spanish 409', async () => {
         const { service, categories } = setup({ exists: true })
-        await expect(service.create({ ...INPUT, slug: 'mugs' })).rejects.toThrow(
-            new ConflictException('Ya existe una categoría con el slug "mugs".'),
+        await expect(service.create({ ...INPUT, slug: 'mujer' })).rejects.toThrow(
+            new ConflictException('Ya existe una categoría con el slug "mujer".'),
         )
         expect(categories.insert).not.toHaveBeenCalled()
     })
@@ -83,7 +80,7 @@ describe('CategoriesService.create', () => {
     it('maps a concurrent unique violation to the same 409', async () => {
         const { service, categories } = setup({})
         categories.insert.mockRejectedValueOnce(uniqueViolation())
-        await expect(service.create({ ...INPUT, slug: 'gorras' })).rejects.toBeInstanceOf(
+        await expect(service.create({ ...INPUT, slug: 'arabes' })).rejects.toBeInstanceOf(
             ConflictException,
         )
     })
@@ -99,19 +96,19 @@ describe('CategoriesService.create', () => {
 describe('CategoriesService.remove', () => {
     it('deletes an empty category', async () => {
         const { service, categories } = setup({ exists: true, productCount: 0 })
-        await service.remove('gorras')
-        expect(categories.delete).toHaveBeenCalledWith({ slug: 'gorras' })
+        await service.remove('arabes')
+        expect(categories.delete).toHaveBeenCalledWith({ slug: 'arabes' })
     })
 
     it('refuses while the category has products, active or hidden, and says how many', async () => {
         const { service, categories, products } = setup({ exists: true, productCount: 6 })
-        await expect(service.remove('mugs')).rejects.toThrow(
+        await expect(service.remove('mujer')).rejects.toThrow(
             new ConflictException(
                 'No puedes eliminar esta categoría porque tiene 6 productos. Muévelos a otra categoría o elimínalos primero.',
             ),
         )
         // No `isActive` filter: hidden products also block the delete.
-        expect(products.countBy).toHaveBeenCalledWith({ categorySlug: 'mugs' })
+        expect(products.countBy).toHaveBeenCalledWith({ categorySlug: 'mujer' })
         expect(categories.delete).not.toHaveBeenCalled()
     })
 
@@ -148,37 +145,35 @@ function setupReorder(existing: string[]) {
             getRawMany: vi.fn().mockResolvedValue([]),
         })),
     }
-    const templates = { find: vi.fn().mockResolvedValue([]) }
     const service = new CategoriesService(
         categories as unknown as Repository<Category>,
         products as unknown as Repository<Product>,
-        templates as unknown as Repository<CategoryDesignTemplate>,
     )
     return { service, categories, manager }
 }
 
 describe('CategoriesService.reorder', () => {
     it('writes positions 0..n-1 in the given order inside one transaction', async () => {
-        const { service, categories, manager } = setupReorder(['mugs', 'tees', 'keychains'])
-        await service.reorder(['keychains', 'mugs', 'tees'])
+        const { service, categories, manager } = setupReorder(['mujer', 'hombre', 'unisex'])
+        await service.reorder(['unisex', 'mujer', 'hombre'])
 
         expect(categories.manager.transaction).toHaveBeenCalledTimes(1)
         expect(manager.update.mock.calls.map((call) => [call[1], call[2]])).toEqual([
-            [{ slug: 'keychains' }, { sortOrder: 0 }],
-            [{ slug: 'mugs' }, { sortOrder: 1 }],
-            [{ slug: 'tees' }, { sortOrder: 2 }],
+            [{ slug: 'unisex' }, { sortOrder: 0 }],
+            [{ slug: 'mujer' }, { sortOrder: 1 }],
+            [{ slug: 'hombre' }, { sortOrder: 2 }],
         ])
         // Returns the refreshed admin list.
         expect(categories.find).toHaveBeenCalled()
     })
 
     it.each([
-        ['a missing category', ['mugs', 'tees']],
-        ['an unknown slug', ['mugs', 'tees', 'gorras']],
-        ['a repeated slug', ['mugs', 'tees', 'tees']],
-        ['an extra slug', ['mugs', 'tees', 'keychains', 'gorras']],
+        ['a missing category', ['mujer', 'hombre']],
+        ['an unknown slug', ['mujer', 'hombre', 'arabes']],
+        ['a repeated slug', ['mujer', 'hombre', 'hombre']],
+        ['an extra slug', ['mujer', 'hombre', 'unisex', 'arabes']],
     ])('refuses a list with %s with a Spanish 400 and writes nothing', async (_, slugs) => {
-        const { service, manager } = setupReorder(['mugs', 'tees', 'keychains'])
+        const { service, manager } = setupReorder(['mujer', 'hombre', 'unisex'])
         await expect(service.reorder(slugs)).rejects.toThrow(
             new BadRequestException(CATEGORY_ORDER_MISMATCH),
         )

@@ -17,13 +17,13 @@ export const BANK_ORDER_MISMATCH =
 /** Sub-route of `admin/catalogs/banks` used to reorder ("order" is never a four-digit code). */
 export const BANK_ORDER_ROUTE = 'order'
 
-/** Matches `Bank` in frontend-cups/src/@types/catalog.ts. */
+/** Matches `Bank` in frontend-perfume-shop/src/@types/catalog.ts. */
 export interface BankDto {
     code: string
     name: string
 }
 
-/** Matches `AdminBank` in frontend-cups/src/@types/catalog.ts. */
+/** Matches `AdminBank` in frontend-perfume-shop/src/@types/catalog.ts. */
 export interface AdminBankDto extends BankDto {
     isActive: boolean
     sortOrder: number

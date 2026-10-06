@@ -25,8 +25,8 @@ function locked(): LockedStock {
 
 describe('stockItemName', () => {
     it('adds the variant label with an en dash', () => {
-        expect(stockItemName('Franela X', 'Talla M')).toBe('Franela X – Talla M')
-        expect(stockItemName('Llavero', null)).toBe('Llavero')
+        expect(stockItemName('Yara X', 'Talla M')).toBe('Yara X – Talla M')
+        expect(stockItemName('Asad', null)).toBe('Asad')
     })
 })
 

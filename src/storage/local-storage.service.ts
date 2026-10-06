@@ -23,9 +23,9 @@ export const LOCAL_UPLOADS_DIR = join(process.cwd(), 'uploads')
  */
 export const LOCAL_PRIVATE_UPLOADS_DIR = join(process.cwd(), 'private-uploads')
 
-const SAFE_PUBLIC_ID = /^(products|design-templates)\/[a-f0-9-]{36}\.(jpg|png|webp)$/
+const SAFE_PUBLIC_ID = /^(products|brands)\/[a-f0-9-]{36}\.(jpg|png|webp)$/
 /** Keys this service creates for private files; anything else is refused (path traversal). */
-const SAFE_PRIVATE_KEY = /^(payment-proofs|designs)\/[a-f0-9-]{36}\.(jpg|png|webp)$/
+const SAFE_PRIVATE_KEY = /^(payment-proofs)\/[a-f0-9-]{36}\.(jpg|png|webp)$/
 
 const CONTENT_TYPES: Record<string, string> = {
     jpg: 'image/jpeg',

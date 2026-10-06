@@ -16,7 +16,6 @@ import { addDays, caracasDay } from '../common/utils/caracas-date.js'
 import { ContentService } from '../content/content.service.js'
 import { isPaymentConfigured, type PaymentContent } from '../content/content.types.js'
 import { newId } from '../database/id.js'
-import { DesignsService } from '../designs/designs.service.js'
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
 import { ProductImage } from '../products/entities/product-image.entity.js'
 import {
@@ -27,11 +26,7 @@ import {
     type LockedStock,
 } from '../products/product-stock.js'
 import { detectImageType } from '../storage/image-type.js'
-import {
-    STORAGE_SERVICE,
-    type PrivateFileAccess,
-    type StorageService,
-} from '../storage/storage.service.js'
+import { STORAGE_SERVICE, type StorageService } from '../storage/storage.service.js'
 import type { CreateOrderDto, OrderItemInputDto } from './dto/create-order.dto.js'
 import { REFERENCE_DIGITS } from './dto/field-names.js'
 import type { SubmitPaymentDto } from './dto/submit-payment.dto.js'
@@ -103,7 +98,7 @@ function units(count: number): string {
     return count === 1 ? '1 unidad' : `${count} unidades`
 }
 
-/** "Solo quedan 2 de «Franela X – Talla M»." / "«Franela X – Talla M» se agotó." */
+/** "Solo quedan 2 de «Yara – 100 ml»." / "«Yara – 100 ml» se agotó." */
 function stockMessage(name: string, stock: number): string {
     if (stock <= 0) return `«${name}» se agotó.`
     const verb = stock === 1 ? 'Solo queda' : 'Solo quedan'
@@ -151,7 +146,6 @@ export class OrdersService {
         private readonly mobilePrefixes: MobilePrefixesService,
         private readonly access: OrderAccessService,
         @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
-        private readonly designs: DesignsService,
     ) {}
 
     /**
@@ -236,8 +230,6 @@ export class OrdersService {
         const order = await this.dataSource.transaction(async (manager) => {
             const catalog = await this.lockCatalog(manager, dto.items)
             const lines = this.priceLines(dto.items, catalog)
-            // After the stock checks: a design problem is only reported for lines that can be bought.
-            const designs = await this.designs.lockForOrder(manager, dto.items, new Date())
 
             const totals = computeTotals(
                 lines.map((line) => ({ unitCents: line.unitCents, quantity: line.quantity })),
@@ -263,7 +255,7 @@ export class OrdersService {
             const now = new Date()
             const created: Order = manager.create(Order, {
                 id: newId(),
-                code: `MR-${String(seq).padStart(6, '0')}`,
+                code: `KZ-${String(seq).padStart(6, '0')}`,
                 status: 'PENDIENTE_PAGO',
                 customerName: dto.fullName,
                 customerEmail: dto.email.toLowerCase(),
@@ -307,21 +299,10 @@ export class OrdersService {
                     unitPriceUsd: fromCents(line.unitCents),
                     quantity: line.quantity,
                     lineTotalUsd: fromCents(line.unitCents * line.quantity),
-                    personalization: line.personalization,
                     sortOrder: index,
-                    designId: designs.get(index)?.id ?? null,
                 }),
             )
             await manager.insert(OrderItem, created.items)
-            // For the response (the design's garment color), once the rows are written.
-            created.items.forEach((item, index) => {
-                item.design = designs.get(index) ?? null
-            })
-            await this.designs.markAttached(
-                manager,
-                [...designs.values()].map((design) => design.id),
-                now,
-            )
 
             const entry = manager.create(OrderStatusHistory, {
                 id: newId(),
@@ -370,16 +351,6 @@ export class OrdersService {
         const order = await this.findAuthorized(code, token)
         const full = await this.loadFull(order.id)
         return toPublicOrder(full, await this.pagoMovil(), await this.catalog.labeler())
-    }
-
-    /** The preview of one of the order's designs, for its private link (404 otherwise). */
-    async designPreview(
-        code: string,
-        token: string | undefined,
-        designId: string,
-    ): Promise<PrivateFileAccess> {
-        const order = await this.findAuthorized(code, token)
-        return this.designs.previewForOrder(order.id, designId)
     }
 
     async submitPayment(
@@ -583,7 +554,7 @@ export class OrdersService {
     private async loadFull(orderId: string): Promise<Order> {
         const order = await this.dataSource.getRepository(Order).findOne({
             where: { id: orderId },
-            relations: { items: { design: true }, payments: true, history: true },
+            relations: { items: true, payments: true, history: true },
         })
         if (!order) throw new NotFoundException(ORDER_NOT_FOUND)
         return order
@@ -688,7 +659,6 @@ export class OrdersService {
                 product,
                 variant: variant ?? null,
                 quantity: item.quantity,
-                personalization: item.personalization ?? null,
                 unitCents: unitPriceCents(product.price, variant?.priceDelta ?? 0),
             }
         })

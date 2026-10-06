@@ -1,4 +1,40 @@
-import type { DesignFormat, DesignImageLayer, DesignLayer } from './design-layers.js'
+/**
+ * Frozen copy of the retired "Diseña con tu imagen" layer types, only as the DesignLayers
+ * migration stored them in `designs.layers`. The feature was removed; the migration still runs.
+ */
+export type DesignFormat = 'jpg' | 'png' | 'webp'
+
+interface LayerPlacement {
+    x: number
+    y: number
+    scale: number
+    rotation: number
+}
+
+export interface DesignImageLayer {
+    type: 'image'
+    z: number
+    placement: LayerPlacement
+    assetIndex: number
+    format: DesignFormat
+    width: number
+    height: number
+    bytes: number
+    dpi: number
+}
+
+export interface DesignTextLayer {
+    type: 'text'
+    z: number
+    placement: LayerPlacement
+    content: string
+    font: string
+    color: string
+    outline: string
+    align: string
+}
+
+export type DesignLayer = DesignImageLayer | DesignTextLayer
 
 /**
  * Mapping between the Stage 1 design row (one image, its original in `designs.original_*`)

@@ -19,11 +19,14 @@ describe('Admin products limits (e2e)', () => {
     }
 
     const validProduct = {
-        name: 'Taza Clásica',
-        categorySlug: 'mugs',
-        price: 12,
-        printText: 'Hola',
-        colorHex: '#FFB3D1',
+        name: 'Lattafa Khamrah',
+        categorySlug: 'arabes',
+        price: 45,
+        brandSlug: 'lattafa',
+        gender: 'unisex',
+        concentration: 'EDP',
+        volumeMl: 100,
+        notesTop: ['Canela'],
         description: '',
         stock: 3,
     }
@@ -146,5 +149,37 @@ describe('Admin products limits (e2e)', () => {
         expect(errorsOf(response.body, 'description')).toContain(
             'La descripción no puede superar los 4000 caracteres.',
         )
+    })
+
+    it('validates the perfume fields in Spanish', async () => {
+        const response = await request(app.getHttpServer())
+            .post('/api/admin/products')
+            .send({
+                ...validProduct,
+                gender: 'otro',
+                concentration: 'XYZ',
+                volumeMl: 0,
+                notesTop: Array.from({ length: 13 }, (_, index) => `Nota ${index}`),
+                sku: 'KZ 0001',
+                variants: [{ label: '50 ml', priceDelta: 0, stock: 1, volumeMl: 1.5 }],
+            })
+            .expect(400)
+        expect(errorsOf(response.body, 'gender')).toEqual(['El género no es válido.'])
+        expect(errorsOf(response.body, 'concentration')).toEqual(['La concentración no es válida.'])
+        expect(errorsOf(response.body, 'volumeMl')).toHaveLength(1)
+        expect(errorsOf(response.body, 'notesTop')).toHaveLength(1)
+        expect(errorsOf(response.body, 'sku')).toEqual([
+            'El SKU solo admite letras, números, puntos, guiones y guiones bajos.',
+        ])
+        expect(errorsOf(response.body, 'variants.0.volumeMl')).toHaveLength(1)
+        expect(products.create).not.toHaveBeenCalled()
+    })
+
+    it('accepts null to clear the brand, concentration, family and SKU on update', async () => {
+        await request(app.getHttpServer())
+            .patch('/api/admin/products/p1')
+            .send({ brandSlug: null, concentration: null, olfactoryFamily: null, sku: null })
+            .expect(200)
+        expect(products.update).toHaveBeenCalledOnce()
     })
 })

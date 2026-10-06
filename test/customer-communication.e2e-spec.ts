@@ -45,9 +45,7 @@ describe('Customer communication: access links, WhatsApp messages and receipts (
         address: 'Av. Principal, casa 4',
         notes: '',
         deliveryMethod: 'delivery',
-        items: [
-            { productId: 'mug-001', variantId: 'v-15oz', quantity: 2, personalization: 'Ñandú' },
-        ],
+        items: [{ productId: 'mug-001', variantId: 'v-15oz', quantity: 2 }],
         ...overrides,
     })
 
@@ -98,7 +96,7 @@ describe('Customer communication: access links, WhatsApp messages and receipts (
         siteUrl = config.get<string>('PUBLIC_SITE_URL') ?? ''
         const signer = new JwtService({ secret: config.get<string>('JWT_SECRET') })
         cookie = (user) =>
-            `mr_session=${signer.sign({ sub: USERS[user].id, role: USERS[user].role }, { expiresIn: 600 })}`
+            `kz_session=${signer.sign({ sub: USERS[user].id, role: USERS[user].role }, { expiresIn: 600 })}`
     })
 
     afterEach(async () => {
@@ -137,7 +135,7 @@ describe('Customer communication: access links, WhatsApp messages and receipts (
             const other = await createOrder()
             await http().get(`/api/orders/${other.code}?t=${token}`).expect(404)
 
-            await admin('post', '/admin/orders/MR-999999/access-links', 'admin').expect(404)
+            await admin('post', '/admin/orders/KZ-999999/access-links', 'admin').expect(404)
         })
     })
 
@@ -195,7 +193,7 @@ describe('Customer communication: access links, WhatsApp messages and receipts (
             ).expect(200)
             expect(body).toMatchObject({ phone: null, url: null, customerPhone: '0212-5551234' })
             expect(body.text).toContain('$36,00 (Bs. 30.760,69)')
-            expect(body.text).toContain('Manada Russo Creativa')
+            expect(body.text).toContain('KaiZen')
         })
 
         it('includes the receipt link once the payment is verified', async () => {

@@ -86,7 +86,7 @@ export class Order {
     @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'orders_pkey' })
     id: string
 
-    /** Human-friendly and sequential: "MR-000123" (from the `order_code_seq` sequence). */
+    /** Human-friendly and sequential: "KZ-000123" (from the `order_code_seq` sequence). */
     @Column({ type: 'text' })
     code: string
 

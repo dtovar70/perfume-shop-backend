@@ -2,28 +2,28 @@ import type { ContactContent } from '../content/content.types.js'
 import { contactLinks, escapeHtml, renderEmail } from './email-layout.js'
 
 const CONTACT: ContactContent = {
-    email: 'hola@manadarusso.com',
+    email: 'hola@kaizen.com',
     phone: '0414-5086536',
     whatsapp: '0414-5086536',
     city: 'Caracas',
     schedule: '',
-    instagram: 'manadarussocreativa',
+    instagram: 'kaizen.perfumeria',
     tiktok: '',
 }
 
 describe('email layout', () => {
     it('escapes every value in the HTML and keeps it readable in the text part', () => {
         const { html, text } = renderEmail({
-            brandName: 'Manada <Russo>',
+            brandName: 'Kai <Zen>',
             contact: CONTACT,
             preheader: 'Hola & bienvenida',
             blocks: [
                 { kind: 'heading', text: '¡Hola, <script>alert(1)</script>!' },
-                { kind: 'paragraph', parts: ['Tu pedido ', { bold: 'MR-000001' }, ' "llegó"'] },
+                { kind: 'paragraph', parts: ['Tu pedido ', { bold: 'KZ-000001' }, ' "llegó"'] },
                 {
                     kind: 'items',
                     items: [
-                        { title: 'Taza <b>', details: ['Personalización: “<img>”'], amount: '$1' },
+                        { title: 'Yara <b>', details: ['Presentación: “<img>”'], amount: '$1' },
                     ],
                 },
                 {
@@ -33,7 +33,7 @@ describe('email layout', () => {
                 },
                 {
                     kind: 'button',
-                    href: 'https://tienda.test/pedido/MR-000001?t=a&b',
+                    href: 'https://tienda.test/pedido/KZ-000001?t=a&b',
                     label: 'Ver mi pedido',
                 },
             ],
@@ -41,19 +41,17 @@ describe('email layout', () => {
         expect(html).not.toContain('<script>')
         expect(html).not.toContain('<img>')
         expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
-        expect(html).toContain('Manada &lt;Russo&gt;')
-        expect(html).toContain('<strong>MR-000001</strong> &quot;llegó&quot;')
-        expect(html).toContain('href="https://tienda.test/pedido/MR-000001?t=a&amp;b"')
+        expect(html).toContain('Kai &lt;Zen&gt;')
+        expect(html).toContain('<strong>KZ-000001</strong> &quot;llegó&quot;')
+        expect(html).toContain('href="https://tienda.test/pedido/KZ-000001?t=a&amp;b"')
         expect(html).toContain('lang="es"')
 
         expect(text).toContain('¡HOLA, <SCRIPT>ALERT(1)</SCRIPT>!')
-        expect(text).toContain('Tu pedido MR-000001 "llegó"')
-        expect(text).toContain('- Taza <b> — $1\n  Personalización: “<img>”')
+        expect(text).toContain('Tu pedido KZ-000001 "llegó"')
+        expect(text).toContain('- Yara <b> — $1\n  Presentación: “<img>”')
         expect(text).toContain('Pago\nMonto: Bs. 1,00')
-        expect(text).toContain('Ver mi pedido: https://tienda.test/pedido/MR-000001?t=a&b')
-        expect(text).toContain(
-            '--\nManada <Russo>\nhola@manadarusso.com: mailto:hola@manadarusso.com',
-        )
+        expect(text).toContain('Ver mi pedido: https://tienda.test/pedido/KZ-000001?t=a&b')
+        expect(text).toContain('--\nKai <Zen>\nhola@kaizen.com: mailto:hola@kaizen.com')
     })
 
     it('never turns a non-web link into an href', () => {
@@ -68,11 +66,11 @@ describe('email layout', () => {
 
     it('lists only the contact data that is set', () => {
         expect(contactLinks(CONTACT)).toEqual([
-            { label: 'hola@manadarusso.com', href: 'mailto:hola@manadarusso.com' },
+            { label: 'hola@kaizen.com', href: 'mailto:hola@kaizen.com' },
             { label: 'WhatsApp 0414-5086536', href: 'https://wa.me/584145086536' },
             {
-                label: 'Instagram @manadarussocreativa',
-                href: 'https://instagram.com/manadarussocreativa',
+                label: 'Instagram @kaizen.perfumeria',
+                href: 'https://instagram.com/kaizen.perfumeria',
             },
         ])
         expect(

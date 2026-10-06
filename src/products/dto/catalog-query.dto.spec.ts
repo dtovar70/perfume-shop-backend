@@ -33,3 +33,24 @@ describe('CatalogQueryDto sort', () => {
         expect(errors).toEqual(['El orden solicitado no es válido.'])
     })
 })
+
+describe('CatalogQueryDto perfume filters', () => {
+    it('accepts repeated or comma-separated brands, a gender, a concentration and a family', async () => {
+        const { dto, errors } = await parse({
+            brand: ['lattafa', 'armaf,afnan'],
+            gender: 'mujer',
+            concentration: 'EDP',
+            family: '  Oriental ',
+            sort: 'name-asc',
+        })
+        expect(errors).toEqual([])
+        expect(dto.brand).toEqual(['lattafa', 'armaf', 'afnan'])
+        expect(dto.family).toBe('Oriental')
+        expect(dto.sort).toBe('name-asc')
+    })
+
+    it('rejects an unknown gender or concentration', async () => {
+        const { errors } = await parse({ gender: 'otro', concentration: 'XYZ' })
+        expect(errors).toHaveLength(2)
+    })
+})

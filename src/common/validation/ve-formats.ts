@@ -1,6 +1,6 @@
 /**
  * Venezuelan formats shared by the content and order DTOs. Mirrored by the storefront in
- * frontend-cups/src/utils/veFormats.ts.
+ * frontend-perfume-shop/src/utils/veFormats.ts.
  */
 
 /**

@@ -2,8 +2,6 @@ import { formatCaracasDateTime, formatDay } from '../../common/utils/caracas-dat
 import { formatBs, formatUsd, formatVeNumber } from '../../common/utils/money-format.js'
 import type { ContactContent, PaymentContent } from '../../content/content.types.js'
 import { renderEmail, type EmailBlock, type EmailInline } from '../../mail/email-layout.js'
-import { designTextsSummary, imageLayers, type DesignLayer } from '../../designs/design-layers.js'
-import type { Design } from '../../designs/entities/design.entity.js'
 import type { OrderItem } from '../entities/order-item.entity.js'
 import type { Order } from '../entities/order.entity.js'
 import { firstName, toWhatsAppPhone } from '../whatsapp/whatsapp-template.js'
@@ -36,26 +34,15 @@ export type OrderReceivedData = Pick<
     | 'exchangeRateDate'
     | 'paymentDueAt'
 > & {
-    items: (Pick<
+    items: Pick<
         OrderItem,
-        | 'productName'
-        | 'variantLabel'
-        | 'quantity'
-        | 'unitPriceUsd'
-        | 'lineTotalUsd'
-        | 'personalization'
-        | 'sortOrder'
-    > &
-        Partial<Pick<OrderItem, 'designId'>> & {
-            /** The line's design, when loaded: its garment color. */
-            design?:
-                (Pick<Design, 'colorName' | 'colorHex'> & Partial<Pick<Design, 'layers'>>) | null
-        })[]
+        'productName' | 'variantLabel' | 'quantity' | 'unitPriceUsd' | 'lineTotalUsd' | 'sortOrder'
+    >[]
 }
 
 export const DELIVERY_METHOD_LABELS = {
     delivery: 'Envío a domicilio',
-    pickup: 'Retiro en el taller',
+    pickup: 'Retiro en tienda',
 } as const
 
 /** "¿Dudas? Responde este correo o escríbenos por WhatsApp." (WhatsApp only when set). */
@@ -71,16 +58,6 @@ function helpParagraph(contact: ContactContent): EmailBlock {
     return { kind: 'paragraph', parts }
 }
 
-/** "Diseño propio con texto «Sofía 7»: …", or the images-only sentence. */
-export function designLine(layers: readonly DesignLayer[] | null | undefined): string {
-    const texts = designTextsSummary(layers)
-    if (texts)
-        return `Diseño propio con texto ${texts}: imprimiremos tu diseño tal como lo armaste.`
-    return imageLayers(layers).length > 1
-        ? 'Diseño propio: imprimiremos las imágenes que subiste.'
-        : 'Diseño propio: imprimiremos la imagen que subiste.'
-}
-
 function itemsBlock(items: OrderReceivedData['items']): EmailBlock {
     return {
         kind: 'items',
@@ -90,19 +67,7 @@ function itemsBlock(items: OrderReceivedData['items']): EmailBlock {
                 title: item.variantLabel
                     ? `${item.productName} · ${item.variantLabel}`
                     : item.productName,
-                details: [
-                    `Cantidad: ${item.quantity} × ${formatUsd(item.unitPriceUsd)}`,
-                    ...(item.designId ? [designLine(item.design?.layers)] : []),
-                    ...(item.designId && item.design?.colorName && item.design.colorHex
-                        ? [
-                              {
-                                  text: `Color: ${item.design.colorName}`,
-                                  swatch: item.design.colorHex,
-                              },
-                          ]
-                        : []),
-                    ...(item.personalization ? [`Personalización: “${item.personalization}”`] : []),
-                ],
+                details: [`Cantidad: ${item.quantity} × ${formatUsd(item.unitPriceUsd)}`],
                 amount: formatUsd(item.lineTotalUsd),
             })),
     }

@@ -1,4 +1,5 @@
 import type { DataSource, Repository } from 'typeorm'
+import type { Brand } from '../brands/entities/brand.entity.js'
 import type { Category } from '../categories/entities/category.entity.js'
 import type { StorageService } from '../storage/storage.service.js'
 import { AdminProductsService } from './admin-products.service.js'
@@ -23,11 +24,14 @@ function setup() {
     const products = {
         findOneBy: vi.fn().mockResolvedValue({
             id: 'p1',
-            slug: 'franela',
-            name: 'Franela',
+            slug: 'yara',
+            name: 'Yara',
             description: '',
-            printText: '',
             tags: [],
+            brandSlug: null,
+            notesTop: [],
+            notesHeart: [],
+            notesBase: [],
             price: 20,
             compareAtPrice: null,
         }),
@@ -48,6 +52,7 @@ function setup() {
         dataSource as unknown as DataSource,
         products as unknown as Repository<Product>,
         categories as unknown as Repository<Category>,
+        {} as Repository<Brand>,
         {} as Repository<ProductImage>,
         reader as unknown as ProductRepository,
         {} as StorageService,
@@ -61,11 +66,9 @@ describe('AdminProductsService stock', () => {
     it('creates a product whose stock is the sum of its variants', async () => {
         const { service, manager } = setup()
         await service.create({
-            name: 'Franela',
-            categorySlug: 'tees',
+            name: 'Yara',
+            categorySlug: 'mujer',
             price: 20,
-            printText: '',
-            colorHex: '#FFFFFF',
             description: '',
             stock: 99,
             variants: [
@@ -88,11 +91,9 @@ describe('AdminProductsService stock', () => {
     it('keeps its own stock for a product without variants', async () => {
         const { service, manager } = setup()
         await service.create({
-            name: 'Llavero',
+            name: 'Asad',
             categorySlug: 'keychains',
             price: 4,
-            printText: '',
-            colorHex: '#FFFFFF',
             description: '',
             stock: 7,
         } as CreateProductDto)

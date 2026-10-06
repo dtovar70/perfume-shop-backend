@@ -14,19 +14,19 @@ import type { Paginated } from './product.mapper.js'
 
 /**
  * Read helpers shared by the catalog and admin services. Pages are resolved in two steps
- * (ids first, then the full rows with variants/images) so LIMIT/OFFSET never interacts
+ * (ids first, then the full rows with brand/variants/images) so LIMIT/OFFSET never interacts
  * with the one-to-many joins.
  */
 @Injectable()
 export class ProductRepository {
     constructor(@InjectRepository(Product) private readonly products: Repository<Product>) {}
 
-    /** Loads products with ordered variants and images, preserving the order of `ids`. */
+    /** Loads products with their brand and ordered variants and images, preserving the order of `ids`. */
     async findByIds(ids: string[]): Promise<Product[]> {
         if (!ids.length) return []
         const rows = await this.products.find({
             where: { id: In(ids) },
-            relations: { variants: true, images: true },
+            relations: { brand: true, variants: true, images: true },
             order: {
                 variants: { sortOrder: 'ASC', id: 'ASC' },
                 images: { sortOrder: 'ASC', createdAt: 'ASC' },

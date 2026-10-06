@@ -1,12 +1,12 @@
 services:
     postgres:
         image: postgres:17
-        container_name: manada-russo-postgres
+        container_name: kaizen-postgres
         restart: unless-stopped
         environment:
-            POSTGRES_DB: manada_russo
-            POSTGRES_USER: manada
-            POSTGRES_PASSWORD: manada
+            POSTGRES_DB: kaizen
+            POSTGRES_USER: kaizen
+            POSTGRES_PASSWORD: kaizen
         ports:
             # Host port 5440 avoids clashing with locally installed Postgres servers (WSL 5432, Windows 5432/5433).
             # Override with POSTGRES_PORT and keep the port in DATABASE_URL in sync.
@@ -14,7 +14,7 @@ services:
         volumes:
             - postgres-data:/var/lib/postgresql/data
         healthcheck:
-            test: ['CMD-SHELL', 'pg_isready -U manada -d manada_russo']
+            test: ['CMD-SHELL', 'pg_isready -U kaizen -d kaizen']
             interval: 5s
             timeout: 5s
             retries: 10
@@ -23,7 +23,7 @@ services:
     # inboxes). Web UI http://localhost:8025, SMTP localhost:1025, no login.
     mailpit:
         image: axllent/mailpit:latest
-        container_name: manada-russo-mailpit
+        container_name: kaizen-mailpit
         restart: unless-stopped
         ports:
             - '${MAILPIT_SMTP_PORT:-1025}:1025'

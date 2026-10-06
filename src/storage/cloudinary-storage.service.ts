@@ -15,13 +15,12 @@ export interface CloudinaryCredentials {
     apiSecret: string
 }
 
-const PUBLIC_ROOT = 'manada-russo'
-const PRIVATE_ROOT = 'manada-russo/private'
+const PUBLIC_ROOT = 'kaizen'
+const PRIVATE_ROOT = 'kaizen/private'
 /** Lifetime of the signed URL an admin is redirected to when opening a private file. */
 const PRIVATE_URL_TTL_SECONDS = 5 * 60
 /** `<folder>/<public_id>.<format>`, as built by `uploadPrivate`. */
-const PRIVATE_KEY =
-    /^manada-russo\/private\/(payment-proofs|designs)\/[A-Za-z0-9_-]+\.(jpg|png|webp)$/
+const PRIVATE_KEY = /^kaizen\/private\/(payment-proofs)\/[A-Za-z0-9_-]+\.(jpg|png|webp)$/
 
 function uploadBuffer(
     buffer: Buffer,
@@ -62,8 +61,7 @@ export class CloudinaryStorageService implements StorageService {
 
     /**
      * Public delivery (`res.cloudinary.com`) answers with `Access-Control-Allow-Origin: *`, so
-     * the storefront can draw these images on a canvas (loaded with `crossOrigin="anonymous"`)
-     * and still export it; the design editor relies on this for the template photos.
+     * the storefront can also draw these images on a canvas (loaded with `crossOrigin="anonymous"`).
      */
     async upload(image: UploadableImage, folder: PublicFolder = 'products'): Promise<StoredFile> {
         const result = await uploadBuffer(image.buffer, {

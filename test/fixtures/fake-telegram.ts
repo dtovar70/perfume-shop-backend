@@ -194,7 +194,7 @@ export class FakeTelegramServer {
                         id: 42,
                         is_bot: true,
                         first_name: 'Manada Test',
-                        username: 'manada_test_bot',
+                        username: 'kaizen_test_bot',
                         can_join_groups: false,
                         can_read_all_group_messages: false,
                         supports_inline_queries: false,

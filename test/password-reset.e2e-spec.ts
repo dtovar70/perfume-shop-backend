@@ -100,7 +100,7 @@ describe('Password reset by Telegram (e2e, fake Bot API)', () => {
 
     const sessionCookie = (header: unknown): string => {
         const cookies = ([] as string[]).concat((header as string[] | string | undefined) ?? [])
-        const session = cookies.find((cookie) => cookie.startsWith('mr_session='))
+        const session = cookies.find((cookie) => cookie.startsWith('kz_session='))
         if (!session) throw new Error('No session cookie')
         return session.split(';')[0] as string
     }
@@ -187,7 +187,7 @@ describe('Password reset by Telegram (e2e, fake Bot API)', () => {
         expect(message.parse_mode).toBe('HTML')
         expect(message.protect_content).toBe(true)
         expect(message.text).toMatch(
-            /^🔐 Código para restablecer tu contraseña de Manada Russo: <b>\d{6}<\/b>\nVence en 10 minutos\. Si no fuiste tú, ignora este mensaje y avísale a un administrador\.$/,
+            /^🔐 Código para restablecer tu contraseña de KaiZen: <b>\d{6}<\/b>\nVence en 10 minutos\. Si no fuiste tú, ignora este mensaje y avísale a un administrador\.$/,
         )
 
         expect(codes()).toHaveLength(1)

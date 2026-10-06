@@ -13,19 +13,19 @@ import {
 
 const VALUES: WhatsAppValues = {
     nombre: 'Ana',
-    pedido: 'MR-000123',
-    enlace: 'https://manadarusso.com/pedido/MR-000123?t=abc',
+    pedido: 'KZ-000123',
+    enlace: 'https://kaizen.com/pedido/KZ-000123?t=abc',
     total: '$36,00 (Bs. 30.760,69)',
     motivo: 'La referencia no coincide',
-    marca: 'Manada Russo Creativa',
+    marca: 'KaiZen Perfumería',
     envio: 'MRW, guía 123456',
-    comprobante: 'https://api.manadarusso.com/api/orders/MR-000123/receipt.pdf?t=abc',
+    comprobante: 'https://api.kaizen.com/api/orders/KZ-000123/receipt.pdf?t=abc',
 }
 
 describe('WhatsApp templates', () => {
     it('renders every placeholder', () => {
         expect(renderWhatsAppTemplate(DEFAULT_WHATSAPP_TEMPLATES.PAGO_RECHAZADO, VALUES)).toBe(
-            'Hola Ana 👋 Revisamos el pago de tu pedido MR-000123 y no pudimos aprobarlo: La referencia no coincide. Puedes subir un nuevo comprobante aquí: https://manadarusso.com/pedido/MR-000123?t=abc',
+            'Hola Ana 👋 Revisamos el pago de tu pedido KZ-000123 y no pudimos aprobarlo: La referencia no coincide. Puedes subir un nuevo comprobante aquí: https://kaizen.com/pedido/KZ-000123?t=abc',
         )
         expect(
             renderWhatsAppTemplate(
@@ -38,7 +38,7 @@ describe('WhatsApp templates', () => {
     it('tidies what an empty value leaves behind', () => {
         const values = { ...VALUES, motivo: '' }
         expect(renderWhatsAppTemplate(DEFAULT_WHATSAPP_TEMPLATES.CANCELADO, values)).toBe(
-            'Hola Ana. Te escribimos por tu pedido MR-000123: lo cancelamos. Si hiciste un pago o tienes alguna duda, respóndenos por aquí y lo resolvemos juntos.',
+            'Hola Ana. Te escribimos por tu pedido KZ-000123: lo cancelamos. Si hiciste un pago o tienes alguna duda, respóndenos por aquí y lo resolvemos juntos.',
         )
         expect(renderWhatsAppTemplate('Motivo: {motivo}.\n  Fin  ', values)).toBe('Motivo.\nFin')
     })

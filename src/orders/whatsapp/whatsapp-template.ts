@@ -2,13 +2,13 @@ import { RECEIPT_STATUSES, type OrderStatus } from '../order-status.js'
 
 /**
  * Placeholders of the WhatsApp message templates (`order_statuses.whatsapp_template`), filled in
- * by `renderWhatsAppTemplate`. Mirrored in frontend-cups/src/views/admin/catalogs/utils/whatsappTemplate.ts
+ * by `renderWhatsAppTemplate`. Mirrored in frontend-perfume-shop/src/views/admin/catalogs/utils/whatsappTemplate.ts
  * (list, descriptions and the preview's sample data): keep both in sync.
  */
 export const WHATSAPP_PLACEHOLDERS = [
     /** The customer's first name. */
     'nombre',
-    /** The order code, "MR-000123". */
+    /** The order code, "KZ-000123". */
     'pedido',
     /** A fresh private link to the customer's order page. */
     'enlace',
@@ -126,15 +126,15 @@ export function whatsAppUrl(phone: string, text: string): string {
  */
 export const DEFAULT_WHATSAPP_TEMPLATES: Record<OrderStatus, string> = {
     PENDIENTE_PAGO:
-        '¡Hola {nombre}! 🐾 Gracias por tu pedido {pedido} en {marca}. Te recordamos que el total es {total}. Puedes pagar por Pago Móvil y subir tu comprobante aquí: {enlace}',
+        '¡Hola {nombre}! ✨ Gracias por tu pedido {pedido} en {marca}. Te recordamos que el total es {total}. Puedes pagar por Pago Móvil y subir tu comprobante aquí: {enlace}',
     PENDIENTE_VERIFICACION:
         '¡Hola {nombre}! 🙌 Recibimos el comprobante de tu pedido {pedido} y lo estamos verificando. Te avisamos apenas lo confirmemos. Puedes ver el estado aquí: {enlace}',
     PAGO_VERIFICADO:
-        '¡Hola {nombre}! ✅ Confirmamos tu pago del pedido {pedido}. Ya estamos preparando tu pieza. Tu comprobante: {comprobante} · Sigue tu pedido: {enlace}',
+        '¡Hola {nombre}! ✅ Confirmamos tu pago del pedido {pedido}. Ya estamos preparando tu perfume. Tu comprobante: {comprobante} · Sigue tu pedido: {enlace}',
     PAGO_RECHAZADO:
         'Hola {nombre} 👋 Revisamos el pago de tu pedido {pedido} y no pudimos aprobarlo: {motivo}. Puedes subir un nuevo comprobante aquí: {enlace}',
     EN_PRODUCCION:
-        '¡Hola {nombre}! 🎨 Tu pedido {pedido} ya está en el taller y lo estamos personalizando con mucho cariño. Síguelo aquí: {enlace}',
+        '¡Hola {nombre}! ✨ Tu pedido {pedido} ya se está preparando: revisamos y empacamos tu perfume con mucho cuidado. Síguelo aquí: {enlace}',
     LISTO_PARA_ENTREGA:
         '¡Hola {nombre}! 🎉 Tu pedido {pedido} está listo. Muy pronto coordinamos la entrega contigo. Detalles: {enlace}',
     ENVIADO:

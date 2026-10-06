@@ -11,14 +11,14 @@ describe('buildCatalogConditions', () => {
     it('maps category, price range and tags to parameterized clauses', () => {
         expect(
             buildCatalogConditions({
-                category: 'mugs',
+                category: 'arabes',
                 minPrice: 10,
                 maxPrice: 20,
                 tags: ['oferta', 'nuevo'],
             }),
         ).toEqual([
             ACTIVE,
-            { clause: 'product.categorySlug = :category', params: { category: 'mugs' } },
+            { clause: 'product.categorySlug = :category', params: { category: 'arabes' } },
             { clause: 'product.price >= :minPrice', params: { minPrice: 10 } },
             { clause: 'product.price <= :maxPrice', params: { maxPrice: 20 } },
             {
@@ -51,12 +51,37 @@ describe('buildCatalogConditions', () => {
 
     it('never interpolates user input into the SQL clause', () => {
         const conditions = buildCatalogConditions({
-            category: "mugs' OR 1=1 --",
+            category: "arabes' OR 1=1 --",
             search: "'; DROP TABLE products; --",
         })
         for (const { clause } of conditions) {
             expect(clause).not.toMatch(/DROP|OR 1=1/)
         }
+    })
+
+    it('maps brands, gender, concentration and family to parameterized clauses', () => {
+        expect(
+            buildCatalogConditions({
+                brand: ['lattafa', 'armaf'],
+                gender: 'mujer',
+                concentration: 'EDP',
+                family: 'Oriental',
+            }).slice(1),
+        ).toEqual([
+            {
+                clause: 'product.brandSlug IN (:...brands)',
+                params: { brands: ['lattafa', 'armaf'] },
+            },
+            { clause: 'product.gender = :gender', params: { gender: 'mujer' } },
+            {
+                clause: 'product.concentration = :concentration',
+                params: { concentration: 'EDP' },
+            },
+            {
+                clause: 'LOWER(product.olfactoryFamily) = LOWER(:family)',
+                params: { family: 'Oriental' },
+            },
+        ])
     })
 
     it('ignores a blank search', () => {
@@ -74,6 +99,7 @@ describe('CATALOG_ORDER_BY', () => {
         expect(CATALOG_ORDER_BY['price-asc'][0]).toEqual(['product.price', 'ASC'])
         expect(CATALOG_ORDER_BY['price-desc'][0]).toEqual(['product.price', 'DESC'])
         expect(CATALOG_ORDER_BY.newest[0]).toEqual(['product.createdAt', 'DESC'])
+        expect(CATALOG_ORDER_BY['name-asc'][0]).toEqual(['product.name', 'ASC'])
     })
 
     it('has no rating sort: the shop has no reviews', () => {
@@ -99,11 +125,12 @@ describe('resolvePageWindow', () => {
 })
 
 describe('derived product fields', () => {
-    it('scores bestsellers (+10) and new products (+4) only', () => {
+    it('scores featured (+20), bestsellers (+10) and new products (+4) only', () => {
         expect(computeRelevanceScore({ tags: ['bestseller', 'nuevo'] })).toBe(14)
         expect(computeRelevanceScore({ tags: ['bestseller'] })).toBe(10)
-        expect(computeRelevanceScore({ tags: ['nuevo', 'personalizable'] })).toBe(4)
+        expect(computeRelevanceScore({ tags: ['nuevo'] })).toBe(4)
         expect(computeRelevanceScore({ tags: ['oferta'] })).toBe(0)
+        expect(computeRelevanceScore({ tags: ['nuevo'], isFeatured: true })).toBe(24)
     })
 
     it('ignores the legacy rating when scoring', () => {
@@ -114,20 +141,37 @@ describe('derived product fields', () => {
     it('builds a normalized search haystack including tags', () => {
         expect(
             computeSearchText({
-                name: 'Taza Café Primero',
-                description: 'Cerámica',
-                printText: '¡Sorpresa!',
+                name: 'Khamrah',
+                description: 'Dátiles',
                 tags: ['oferta'],
             }),
-        ).toBe('taza cafe primero ceramica ¡sorpresa! oferta')
+        ).toBe('khamrah datiles oferta')
+    })
+
+    it('includes the brand, gender, concentration, family and notes', () => {
+        expect(
+            computeSearchText({
+                name: 'Yara',
+                description: '',
+                tags: [],
+                brandName: 'Lattafa',
+                gender: 'mujer',
+                concentration: 'EDP',
+                olfactoryFamily: 'Floral frutal',
+                notesTop: ['Orquídea'],
+                notesHeart: ['Frutas tropicales'],
+                notesBase: ['Vainilla'],
+            }),
+        ).toBe(
+            'yara lattafa mujer edp eau de parfum floral frutal orquidea frutas tropicales vainilla',
+        )
     })
 
     it('adds "favorito" for bestsellers, the word the store shows', () => {
         expect(
             computeSearchText({
-                name: 'Taza',
+                name: 'Yara',
                 description: '',
-                printText: '',
                 tags: ['bestseller'],
             }),
         ).toContain('bestseller favorito')

@@ -1,6 +1,6 @@
 /**
  * Lengths, list sizes and formats of the editable content. Mirrored by the admin forms in
- * frontend-cups/src/views/admin/content/schema/content.schema.ts.
+ * frontend-perfume-shop/src/views/admin/content/schema/content.schema.ts.
  */
 export const CONTENT_LIMITS = {
     /** Button labels, badges, eyebrows, short list items. */

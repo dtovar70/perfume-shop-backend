@@ -1,6 +1,6 @@
 /**
  * Colors an order status badge may take: the tones of the storefront's `Badge` component
- * (frontend-cups/src/components/ui/Badge.tsx). Enforced by a CHECK on `order_statuses.tone`.
+ * (frontend-perfume-shop/src/components/ui/Badge.tsx). Enforced by a CHECK on `order_statuses.tone`.
  */
 export const BADGE_TONES = ['blush', 'sky', 'mint', 'butter', 'lilac', 'solid', 'neutral'] as const
 

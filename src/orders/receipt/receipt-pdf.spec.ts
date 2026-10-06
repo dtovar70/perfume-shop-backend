@@ -1,32 +1,29 @@
 import { orderQrPng } from '../qr/order-qr.js'
-import {
-    personalizationCell,
-    printable,
-    renderReceiptPdf,
-    type ReceiptData,
-} from './receipt-pdf.js'
+import { printable, renderReceiptPdf, type ReceiptData } from './receipt-pdf.js'
 
 function receipt(items: number): ReceiptData {
     return {
-        brandName: 'Manada Russo Creativa',
-        tagline: 'Sublimación hecha con amor',
+        brandName: 'KaiZen',
+        tagline: 'Perfumería de autor',
         contact: {
             phone: '0414-5086536',
             whatsapp: '0414-5086536',
-            email: 'hola@manadarusso.com',
+            email: 'hola@kaizen.com',
             city: 'Quíbor, estado Lara',
-            instagram: 'manadarussocreativa',
+            instagram: 'kaizen.perfumeria',
         },
-        code: 'MR-000012',
+        code: 'KZ-000012',
         issuedAt: '25/09/2026, 10:42 a. m.',
         verifiedAt: '24/09/2026, 3:05 p. m.',
         statusLabel: 'En producción',
         customer: { name: 'Ana María Pérez', email: 'ana@example.com', phone: '0414-1234567' },
         delivery: { method: 'Envío a domicilio', address: 'Av. Principal, casa 4, Caracas' },
         items: Array.from({ length: items }, (_, index) => ({
-            name: `Taza Ñandú ${index + 1}`,
-            variant: '15 oz',
-            personalization: index % 2 ? 'Feliz cumpleaños, Begoña – 2026 · ¡Te quiero! 🎉' : null,
+            name:
+                index % 2
+                    ? `Lattafa Yara Ñandú ${index + 1} – Edición ✨`
+                    : `Dior Sauvage ${index + 1}`,
+            variant: '100 ml',
             quantity: 2,
             unitUsd: 16,
             totalUsd: 32,
@@ -68,29 +65,12 @@ describe('receipt PDF', () => {
         const plain = await renderReceiptPdf(receipt(3))
         const withQr = await renderReceiptPdf({
             ...receipt(3),
-            orderQr: await orderQrPng('https://manadarusso.com/pedido/MR-000012?t=abc', 360),
+            orderQr: await orderQrPng('https://kaizen.com/pedido/KZ-000012?t=abc', 360),
         })
         const images = (pdf: Buffer) =>
             pdf.toString('latin1').match(/\/Subtype \/Image/g)?.length ?? 0
         expect(images(withQr)).toBe(images(plain) + 1)
         expect(pageCount(withQr)).toBe(1)
-    })
-
-    it('names the own design and its garment color in the personalization column', () => {
-        expect(
-            personalizationCell({ hasDesign: true, designColor: 'Negro', personalization: 'Luna' }),
-        ).toBe('Diseño propio\nColor: Negro\n“Luna”')
-        expect(personalizationCell({ hasDesign: true, personalization: null })).toBe(
-            'Diseño propio',
-        )
-        expect(personalizationCell({ hasDesign: false, personalization: null })).toBe('—')
-        expect(
-            personalizationCell({
-                hasDesign: true,
-                designTexts: '«Sofía 7 🎂», «Luna»',
-                personalization: null,
-            }),
-        ).toBe('Diseño propio con texto «Sofía 7 », «Luna»')
     })
 
     it('paginates long item lists', async () => {

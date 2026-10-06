@@ -15,6 +15,7 @@ import { Product } from './product.entity.js'
 @Entity({ name: 'product_variants' })
 @Index('product_variants_product_id_idx', ['productId'])
 @Check('product_variants_stock_check', `"stock" >= 0`)
+@Check('product_variants_volume_ml_check', `"volume_ml" IS NULL OR "volume_ml" > 0`)
 export class ProductVariant {
     @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'product_variants_pkey' })
     id: string
@@ -45,8 +46,9 @@ export class ProductVariant {
     })
     priceDelta: number
 
-    @Column({ name: 'color_hex', type: 'varchar', length: TEXT_INPUT_MAX_LENGTH, nullable: true })
-    colorHex: string | null
+    /** Bottle size of this version ("50 ml"), when the variants are sizes. */
+    @Column({ name: 'volume_ml', type: 'integer', nullable: true })
+    volumeMl: number | null
 
     @Column({ name: 'sort_order', type: 'integer', default: 0 })
     sortOrder: number

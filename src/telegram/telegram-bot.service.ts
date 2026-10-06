@@ -15,7 +15,7 @@ export const ALLOWED_UPDATES = ['message', 'callback_query'] as const
 
 export const BOT_COMMANDS: BotCommand[] = [
     { command: 'pendientes', description: 'Pagos por verificar' },
-    { command: 'pedido', description: 'Resumen de un pedido: /pedido MR-000012' },
+    { command: 'pedido', description: 'Resumen de un pedido: /pedido KZ-000012' },
     { command: 'micuenta', description: 'Tu cuenta del panel vinculada a este chat' },
     { command: 'ayuda', description: 'Qué puedo hacer' },
     { command: 'salir', description: 'Desvincular este chat' },

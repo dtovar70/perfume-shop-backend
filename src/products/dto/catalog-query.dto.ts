@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer'
 import {
+    ArrayMaxSize,
     IsArray,
     IsIn,
     IsInt,
@@ -16,9 +17,14 @@ import { msg } from '../../common/validation/messages.js'
 import {
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
+    PRODUCT_CONCENTRATIONS,
+    PRODUCT_FAMILY_MAX_LENGTH,
+    PRODUCT_GENDERS,
     PRODUCT_TAGS,
     RETIRED_SORT_OPTIONS,
     SORT_OPTIONS,
+    type ProductConcentration,
+    type ProductGender,
     type ProductTag,
     type SortOption,
 } from '../products.constants.js'
@@ -62,6 +68,31 @@ export class CatalogQueryDto {
     @IsIn(PRODUCT_TAGS, { each: true, message: 'Alguna de las etiquetas no es válida.' })
     tags?: ProductTag[]
 
+    /** Brand slugs: `?brand=lattafa&brand=armaf` or `?brand=lattafa,armaf` (any of them). */
+    @IsOptional()
+    @Transform(toStringArray)
+    @IsArray({ message: msg.list(FIELD.brands) })
+    @ArrayMaxSize(20, { message: msg.listMaxSize(FIELD.brands, 20) })
+    @Matches(SLUG_PATTERN, { each: true, message: 'Alguna de las marcas no es válida.' })
+    brand?: string[]
+
+    @IsOptional()
+    @IsIn(PRODUCT_GENDERS, { message: msg.invalid(FIELD.gender) })
+    gender?: ProductGender
+
+    @IsOptional()
+    @IsIn(PRODUCT_CONCENTRATIONS, { message: msg.invalid(FIELD.concentration) })
+    concentration?: ProductConcentration
+
+    /** Olfactory family ("Oriental"), compared ignoring case. */
+    @IsOptional()
+    @Transform(toTrimmedString)
+    @IsString({ message: msg.text(FIELD.olfactoryFamily) })
+    @MaxLength(PRODUCT_FAMILY_MAX_LENGTH, {
+        message: msg.maxLength(FIELD.olfactoryFamily, PRODUCT_FAMILY_MAX_LENGTH),
+    })
+    family?: string
+
     @IsOptional()
     @Type(() => Number)
     @IsInt({ message: msg.integer(FIELD.page) })
@@ -74,4 +105,11 @@ export class CatalogQueryDto {
     @Min(1, { message: msg.min(FIELD.pageSize, 1) })
     @Max(MAX_PAGE_SIZE, { message: msg.max(FIELD.pageSize, MAX_PAGE_SIZE) })
     pageSize: number = DEFAULT_PAGE_SIZE
+}
+
+/** `GET /products/facets`: optionally scoped to one category. */
+export class FacetsQueryDto {
+    @IsOptional()
+    @Matches(SLUG_PATTERN, { message: msg.invalid(FIELD.category) })
+    category?: string
 }

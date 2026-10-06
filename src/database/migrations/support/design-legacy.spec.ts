@@ -1,9 +1,13 @@
-import type { DesignLayer } from './design-layers.js'
-import { layeredToLegacy, legacyToLayered, type LegacyDesignRow } from './design-legacy.js'
+import {
+    layeredToLegacy,
+    legacyToLayered,
+    type DesignLayer,
+    type LegacyDesignRow,
+} from './design-legacy.js'
 
 const ROW: LegacyDesignRow = {
     id: 'd1',
-    original_key: 'manada-russo/private/designs/abc.jpg',
+    original_key: 'kaizen/private/designs/abc.jpg',
     original_format: 'jpg',
     original_width: 2362,
     original_height: 1004,
@@ -34,7 +38,7 @@ describe('legacyToLayered', () => {
                 design_id: 'd1',
                 kind: 'original',
                 layer_index: 0,
-                storage_key: 'manada-russo/private/designs/abc.jpg',
+                storage_key: 'kaizen/private/designs/abc.jpg',
                 format: 'jpg',
                 width: 2362,
                 height: 1004,

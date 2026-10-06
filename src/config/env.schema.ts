@@ -12,7 +12,7 @@ const optionalString = z
     .optional()
     .transform((value) => (value ? value : undefined))
 
-/** "pedidos@tienda.com" or "Manada Russo Creativa <pedidos@tienda.com>". */
+/** "pedidos@tienda.com" or "KaiZen Perfumería <pedidos@tienda.com>". */
 const MAILBOX_PATTERN =
     /^(?:[^<>@]*<[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>|[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)$/
 const MAILBOX_MESSAGE = 'Use an address like "Name <pedidos@example.com>" or "pedidos@example.com"'
@@ -102,7 +102,7 @@ const envObject = z.object({
         .transform((value) => value.replace(/\/+$/, '')),
     /**
      * Public address of the storefront, used to build the customer's order links
-     * (`<PUBLIC_SITE_URL>/pedido/MR-000123?t=…`) the admin sends by WhatsApp.
+     * (`<PUBLIC_SITE_URL>/pedido/KZ-000123?t=…`) the admin sends by WhatsApp.
      */
     PUBLIC_SITE_URL: z
         .url()

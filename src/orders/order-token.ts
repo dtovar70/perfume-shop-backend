@@ -7,7 +7,7 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
 const DUMMY_HASH = createHash('sha256').update('no-order').digest()
 
 /**
- * Customers reach their order through a private link (`/pedido/MR-000123?t=<token>`). Only the
+ * Customers reach their order through a private link (`/pedido/KZ-000123?t=<token>`). Only the
  * SHA-256 of the token is stored, so a database leak does not leak working links.
  */
 export function generateAccessToken(): { token: string; hash: string } {

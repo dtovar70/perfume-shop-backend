@@ -15,7 +15,7 @@ describe('LocalStorageService private files', () => {
     let storage: LocalStorageService
 
     beforeEach(async () => {
-        dir = await mkdtemp(join(tmpdir(), 'mr-private-'))
+        dir = await mkdtemp(join(tmpdir(), 'kz-private-'))
         storage = new LocalStorageService('http://localhost:3000', dir)
     })
 

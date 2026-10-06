@@ -1,3 +1,4 @@
+import { applyDecorators } from '@nestjs/common'
 import { Type } from 'class-transformer'
 import {
     ArrayMaxSize,
@@ -17,13 +18,22 @@ import {
     ValidateIf,
     ValidateNested,
 } from 'class-validator'
-import { HEX_COLOR_PATTERN, SLUG_PATTERN } from '../../common/utils/text.util.js'
+import { SLUG_PATTERN } from '../../common/utils/text.util.js'
 import { msg } from '../../common/validation/messages.js'
 import { MaxInputLength, TEXT_INPUT_MAX_LENGTH } from '../../common/validation/text-limits.js'
 import {
+    PRODUCT_CONCENTRATIONS,
     PRODUCT_DESCRIPTION_MAX_LENGTH,
+    PRODUCT_FAMILY_MAX_LENGTH,
+    PRODUCT_GENDERS,
     PRODUCT_MAX_HIGHLIGHTS,
+    PRODUCT_MAX_NOTES,
+    PRODUCT_MAX_VOLUME_ML,
+    PRODUCT_NOTE_MAX_LENGTH,
+    PRODUCT_SKU_MAX_LENGTH,
     PRODUCT_TAGS,
+    type ProductConcentration,
+    type ProductGender,
     type ProductTag,
 } from '../products.constants.js'
 import { FIELD } from './field-names.js'
@@ -31,6 +41,24 @@ import { FIELD } from './field-names.js'
 const MAX_PRICE = 99_999_999.99
 /** A typo never overflows the `integer` columns, not even summed over every variant. */
 const MAX_STOCK = 1_000_000
+
+/** "KZ-0001": letters, digits, dots, dashes and underscores. */
+export const SKU_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+
+/** One tier of the olfactory pyramid: a list of short single-line notes. */
+function NotesList(field: (typeof FIELD)['notesTop']): PropertyDecorator {
+    return applyDecorators(
+        IsOptional(),
+        IsArray({ message: msg.list(field) }),
+        ArrayMaxSize(PRODUCT_MAX_NOTES, { message: msg.listMaxSize(field, PRODUCT_MAX_NOTES) }),
+        IsString({ each: true, message: 'Cada nota debe ser un texto.' }),
+        IsNotEmpty({ each: true, message: 'Ninguna nota puede estar vacía.' }),
+        MaxLength(PRODUCT_NOTE_MAX_LENGTH, {
+            each: true,
+            message: `Cada nota no puede superar los ${PRODUCT_NOTE_MAX_LENGTH} caracteres.`,
+        }),
+    )
+}
 
 export class ProductVariantInputDto {
     /**
@@ -52,10 +80,13 @@ export class ProductVariantInputDto {
     @Max(MAX_PRICE, { message: msg.max(FIELD.variantPriceDelta, MAX_PRICE) })
     priceDelta: number
 
+    /** Bottle size of this version ("50 ml"); omit or null when the variant is not a size. */
     @IsOptional()
-    @MaxInputLength(FIELD.variantColor)
-    @Matches(HEX_COLOR_PATTERN, { message: msg.hexColor(FIELD.variantColor) })
-    colorHex?: string
+    @ValidateIf((_object, value) => value !== null)
+    @IsInt({ message: msg.integer(FIELD.variantVolumeMl) })
+    @Min(1, { message: msg.min(FIELD.variantVolumeMl, 1) })
+    @Max(PRODUCT_MAX_VOLUME_ML, { message: msg.max(FIELD.variantVolumeMl, PRODUCT_MAX_VOLUME_ML) })
+    volumeMl?: number | null
 
     @IsInt({ message: msg.integer(FIELD.variantStock) })
     @Min(0, { message: msg.notNegative(FIELD.variantStock) })
@@ -91,13 +122,64 @@ export class CreateProductDto {
     @Max(MAX_PRICE, { message: msg.max(FIELD.compareAtPrice, MAX_PRICE) })
     compareAtPrice?: number | null
 
-    @IsString({ message: msg.text(FIELD.printText) })
-    @MaxLength(80, { message: msg.maxLength(FIELD.printText, 80) })
-    printText: string
+    /** The perfume house; send null to remove it. */
+    @IsOptional()
+    @ValidateIf((_object, value) => value !== null)
+    @Matches(SLUG_PATTERN, { message: msg.invalid(FIELD.brand) })
+    brandSlug?: string | null
 
-    @MaxInputLength(FIELD.color)
-    @Matches(HEX_COLOR_PATTERN, { message: msg.hexColor(FIELD.color) })
-    colorHex: string
+    /** `unisex` when omitted on create. */
+    @IsOptional()
+    @IsIn(PRODUCT_GENDERS, { message: msg.invalid(FIELD.gender) })
+    gender?: ProductGender
+
+    @IsOptional()
+    @ValidateIf((_object, value) => value !== null)
+    @IsIn(PRODUCT_CONCENTRATIONS, { message: msg.invalid(FIELD.concentration) })
+    concentration?: ProductConcentration | null
+
+    @IsOptional()
+    @ValidateIf((_object, value) => value !== null)
+    @IsInt({ message: msg.integer(FIELD.volumeMl) })
+    @Min(1, { message: msg.min(FIELD.volumeMl, 1) })
+    @Max(PRODUCT_MAX_VOLUME_ML, { message: msg.max(FIELD.volumeMl, PRODUCT_MAX_VOLUME_ML) })
+    volumeMl?: number | null
+
+    /** Top notes ("notas de salida"). */
+    @NotesList(FIELD.notesTop)
+    notesTop?: string[]
+
+    /** Heart notes ("notas de corazón"). */
+    @NotesList(FIELD.notesHeart)
+    notesHeart?: string[]
+
+    /** Base notes ("notas de fondo"). */
+    @NotesList(FIELD.notesBase)
+    notesBase?: string[]
+
+    @IsOptional()
+    @ValidateIf((_object, value) => value !== null)
+    @IsString({ message: msg.text(FIELD.olfactoryFamily) })
+    @IsNotEmpty({ message: msg.required(FIELD.olfactoryFamily) })
+    @MaxLength(PRODUCT_FAMILY_MAX_LENGTH, {
+        message: msg.maxLength(FIELD.olfactoryFamily, PRODUCT_FAMILY_MAX_LENGTH),
+    })
+    olfactoryFamily?: string | null
+
+    @IsOptional()
+    @IsBoolean({ message: msg.boolean(FIELD.isFeatured) })
+    isFeatured?: boolean
+
+    /** Internal stock code, unique when set; send null to remove it. */
+    @IsOptional()
+    @ValidateIf((_object, value) => value !== null)
+    @MaxLength(PRODUCT_SKU_MAX_LENGTH, {
+        message: msg.maxLength(FIELD.sku, PRODUCT_SKU_MAX_LENGTH),
+    })
+    @Matches(SKU_PATTERN, {
+        message: 'El SKU solo admite letras, números, puntos, guiones y guiones bajos.',
+    })
+    sku?: string | null
 
     @IsString({ message: msg.text(FIELD.description) })
     @MaxLength(PRODUCT_DESCRIPTION_MAX_LENGTH, {

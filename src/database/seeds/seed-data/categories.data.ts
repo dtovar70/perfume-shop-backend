@@ -1,32 +1,53 @@
 import type { SeedCategory } from './types.js'
 
-/**
- * Copied from frontend-cups/src/mock/data/categories.data.ts. PALETTE references were
- * resolved to their hex values (blush300, sky300, lilac400). Array order = sortOrder.
- */
+/** Array order = sortOrder. */
 export const categories: SeedCategory[] = [
     {
-        slug: 'mugs',
-        name: 'Tazas',
-        tagline: 'Tu mañana, con tu diseño',
+        slug: 'arabes',
+        name: 'Árabes',
+        tagline: 'La opulencia de Oriente',
         description:
-            'Cerámica sublimada a 180 °C: el diseño queda fundido en la taza, así que aguanta microondas, lavavajillas y años de café.',
-        colorHex: '#FFB3D1',
+            'Oud, ámbar, azafrán y especias en fragancias intensas y duraderas de las grandes casas de Dubái y Emiratos. Lujo envolvente a un precio sorprendente.',
+        colorHex: '#C9A227',
     },
     {
-        slug: 'tees',
-        name: 'Franelas',
-        tagline: 'Se pone y se nota',
+        slug: 'europeos',
+        name: 'Europeos',
+        tagline: 'Los clásicos de diseñador',
         description:
-            'Algodón suave con estampado que no se agrieta ni se despega. Cortes unisex, crop y oversize, de la talla S a la XXL.',
-        colorHex: '#A8D8FF',
+            'Las firmas que marcaron época: Dior, Carolina Herrera, Versace y Jean Paul Gaultier. Elegancia reconocible al primer instante.',
+        colorHex: '#B76E79',
     },
     {
-        slug: 'keychains',
-        name: 'Llaveros',
-        tagline: 'El detalle que se lleva puesto',
+        slug: 'mujer',
+        name: 'Mujer',
+        tagline: 'Femeninas, magnéticas, inolvidables',
         description:
-            'Acrílico, madera o metal con tu nombre, tu foto o tu mascota. El regalo pequeño que siempre termina en las llaves de todos.',
-        colorHex: '#C0AEFF',
+            'Florales luminosos, gourmands seductores y frutales llenos de vida. Fragancias que acompañan cada faceta de tu día.',
+        colorHex: '#E8B4B8',
+    },
+    {
+        slug: 'hombre',
+        name: 'Hombre',
+        tagline: 'Presencia que se recuerda',
+        description:
+            'Aromáticos frescos, amaderados profundos y especiados con carácter. Para el que deja huella sin decir una palabra.',
+        colorHex: '#8C6A4F',
+    },
+    {
+        slug: 'unisex',
+        name: 'Unisex',
+        tagline: 'Sin reglas, solo esencia',
+        description:
+            'Fragancias que no entienden de etiquetas: ámbar, maderas y resinas pensadas para quien elige por instinto.',
+        colorHex: '#D4AF7A',
+    },
+    {
+        slug: 'sets-regalo',
+        name: 'Sets y regalos',
+        tagline: 'El detalle perfecto, listo para regalar',
+        description:
+            'Estuches con perfume y complementos en presentación de regalo. Para sorprender en cumpleaños, aniversarios y fechas especiales.',
+        colorHex: '#F2C6C2',
     },
 ]

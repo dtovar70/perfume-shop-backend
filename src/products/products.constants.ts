@@ -1,10 +1,25 @@
-export const PRODUCT_TAGS = ['nuevo', 'bestseller', 'oferta', 'personalizable'] as const
+export const PRODUCT_TAGS = ['nuevo', 'bestseller', 'oferta'] as const
 export type ProductTag = (typeof PRODUCT_TAGS)[number]
 
-export const SORT_OPTIONS = ['relevance', 'price-asc', 'price-desc', 'newest'] as const
+export const SORT_OPTIONS = ['relevance', 'price-asc', 'price-desc', 'newest', 'name-asc'] as const
 export type SortOption = (typeof SORT_OPTIONS)[number]
 /** Sorts that no longer exist but may live on in bookmarked URLs; they fall back to relevance. */
 export const RETIRED_SORT_OPTIONS: readonly string[] = ['rating']
+
+export const PRODUCT_GENDERS = ['mujer', 'hombre', 'unisex'] as const
+export type ProductGender = (typeof PRODUCT_GENDERS)[number]
+
+/** Eau de Cologne, Eau de Toilette, Eau de Parfum, Parfum and Extrait de Parfum. */
+export const PRODUCT_CONCENTRATIONS = ['EDC', 'EDT', 'EDP', 'PARFUM', 'EXTRAIT'] as const
+export type ProductConcentration = (typeof PRODUCT_CONCENTRATIONS)[number]
+
+/** Olfactory notes per tier (top, heart, base): at most this many, each a single-line text. */
+export const PRODUCT_MAX_NOTES = 12
+export const PRODUCT_NOTE_MAX_LENGTH = 60
+export const PRODUCT_FAMILY_MAX_LENGTH = 60
+export const PRODUCT_SKU_MAX_LENGTH = 40
+/** A bottle size in milliliters (also for variants). */
+export const PRODUCT_MAX_VOLUME_ML = 5000
 
 export const DEFAULT_PAGE_SIZE = 12
 export const MAX_PAGE_SIZE = 48

@@ -1,10 +1,19 @@
-/**
- * Seed-only shapes. They mirror the frontend mock types (src/@types/product.ts in
- * frontend-cups) so the data files can be copied over verbatim.
- */
-export type SeedCategorySlug = 'mugs' | 'tees' | 'keychains'
+/** Seed-only shapes: the KaiZen starter catalog. */
+export type SeedCategorySlug = 'arabes' | 'europeos' | 'mujer' | 'hombre' | 'unisex' | 'sets-regalo'
 
-export type SeedProductTag = 'nuevo' | 'bestseller' | 'oferta' | 'personalizable'
+export type SeedBrandSlug =
+    | 'lattafa'
+    | 'armaf'
+    | 'afnan'
+    | 'rasasi'
+    | 'maison-alhambra'
+    | 'al-haramain'
+    | 'carolina-herrera'
+    | 'dior'
+    | 'versace'
+    | 'jean-paul-gaultier'
+
+export type SeedProductTag = 'nuevo' | 'bestseller' | 'oferta'
 
 export interface SeedCategory {
     slug: SeedCategorySlug
@@ -14,28 +23,43 @@ export interface SeedCategory {
     colorHex: string
 }
 
+export interface SeedBrand {
+    slug: SeedBrandSlug
+    name: string
+    description: string
+}
+
+/** A bottle size with its own price difference and stock. */
 export interface SeedVariant {
     id: string
     label: string
     priceDelta: number
-    colorHex?: string
+    volumeMl: number
+    stock: number
 }
 
 export interface SeedProduct {
     id: string
+    sku: string
     slug: string
     name: string
+    brand: SeedBrandSlug
     category: SeedCategorySlug
+    gender: 'mujer' | 'hombre' | 'unisex'
+    concentration: 'EDC' | 'EDT' | 'EDP' | 'PARFUM' | 'EXTRAIT'
+    volumeMl: number
     price: number
     compareAtPrice?: number
-    printText: string
-    colorHex: string
+    olfactoryFamily: string
+    notesTop: string[]
+    notesHeart: string[]
+    notesBase: string[]
     description: string
     highlights: string[]
-    variants: SeedVariant[]
-    rating: number
-    reviewCount: number
     tags: SeedProductTag[]
+    isFeatured: boolean
+    /** Without variants; with variants the product's stock is the sum of theirs. */
     stock: number
+    variants: SeedVariant[]
     createdAt: string
 }

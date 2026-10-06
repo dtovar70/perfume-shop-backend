@@ -1,20 +1,5 @@
 import { caracasDay } from '../common/utils/caracas-date.js'
 import type { PaymentContent } from '../content/content.types.js'
-import {
-    artworkFilename,
-    DESIGN_FONTS,
-    originalFilename,
-    type DesignFormat,
-    type LayerPlacement,
-    type TextAlign,
-    type TextOutline,
-} from '../designs/design-layers.js'
-import { dpiLevel, type DpiLevel } from '../designs/design-templates.js'
-import {
-    designColorOf,
-    type DesignColor,
-    type DesignPrintSize,
-} from '../designs/entities/design.entity.js'
 import { RATE_SOURCE_LABELS, type RateSource } from '../exchange-rate/providers/rate-provider.js'
 import type { OrderItem } from './entities/order-item.entity.js'
 import type { OrderNote } from './entities/order-note.entity.js'
@@ -54,80 +39,10 @@ export interface OrderItemDto {
     unitPriceUsd: number
     quantity: number
     lineTotalUsd: number
-    personalization: string | null
-    /** The customer's own image ("Diseño propio"); null for a regular line. */
-    design: OrderItemDesignDto | null
-}
-
-export interface OrderItemDesignDto {
-    id: string
-    /**
-     * API path of the mockup preview. Customer: add the order's `?t=` token. Admin: the session
-     * authorizes it.
-     */
-    previewPath: string
-    /** The garment color it was made on ("Negro", `#1F2937`); null without template colors. */
-    color: DesignColor | null
-}
-
-export interface AdminDesignImageLayerDto {
-    type: 'image'
-    /** Position in the design, bottom (0) to top. */
-    index: number
-    /** 1-based among the design's images ("Imagen 2"). */
-    number: number
-    placement: LayerPlacement
-    format: DesignFormat
-    width: number
-    height: number
-    bytes: number
-    dpi: number
-    dpiLevel: DpiLevel
-    /** API path that downloads the original, named like `downloadName`. */
-    downloadPath: string
-    /** API path that shows the original inline (thumbnail). */
-    viewPath: string
-    /** `MR-000123-linea1-imagen1.jpg`. */
-    downloadName: string
-}
-
-export interface AdminDesignTextLayerDto {
-    type: 'text'
-    index: number
-    placement: LayerPlacement
-    content: string
-    font: string
-    fontLabel: string
-    color: string
-    outline: TextOutline
-    align: TextAlign
-}
-
-export type AdminDesignLayerDto = AdminDesignImageLayerDto | AdminDesignTextLayerDto
-
-export interface AdminOrderItemDesignDto extends OrderItemDesignDto {
-    printSize: DesignPrintSize | null
-    /** The lowest DPI among the image layers; null with only text. */
-    dpiEstimate: number | null
-    dpiLevel: DpiLevel | null
-    /** Bottom to top. */
-    layers: AdminDesignLayerDto[]
-    /** The print-ready file; null for older designs (made before it existed). */
-    artwork: {
-        path: string
-        /** `MR-000123-linea1-arte-final.png`. */
-        downloadName: string
-        width: number
-        height: number
-        bytes: number
-        /** Its print resolution (100–200); null if unknown. */
-        dpi: number | null
-    } | null
 }
 
 export interface AdminOrderItemDto extends OrderItemDto {
     id: string
-    design: AdminOrderItemDesignDto | null
 }
 
 export interface OrderTotalsDto {
@@ -328,7 +243,7 @@ function toCustomer(order: Order): OrderCustomerDto {
     }
 }
 
-function toItem(item: OrderItem, code: string): OrderItemDto {
+function toItem(item: OrderItem): OrderItemDto {
     return {
         productId: item.productId,
         productName: item.productName,
@@ -339,92 +254,11 @@ function toItem(item: OrderItem, code: string): OrderItemDto {
         unitPriceUsd: item.unitPriceUsd,
         quantity: item.quantity,
         lineTotalUsd: item.lineTotalUsd,
-        personalization: item.personalization,
-        design: item.designId
-            ? {
-                  id: item.designId,
-                  previewPath: customerDesignPath(code, item.designId),
-                  color: designColorOf(item.design),
-              }
-            : null,
     }
 }
 
-export function customerDesignPath(code: string, designId: string): string {
-    return `/orders/${encodeURIComponent(code)}/designs/${encodeURIComponent(designId)}/preview`
-}
-
-export function adminDesignPath(code: string, itemId: string, file: string) {
-    return `/admin/orders/${encodeURIComponent(code)}/items/${encodeURIComponent(itemId)}/design/${file}`
-}
-
-function toAdminDesign(item: OrderItem, code: string): AdminOrderItemDesignDto | null {
-    if (!item.designId) return null
-    const design = item.design ?? null
-    const line = item.sortOrder + 1
-    const layers: AdminDesignLayerDto[] = []
-    let number = 0
-    for (const [index, layer] of (design?.layers ?? []).entries()) {
-        if (layer.type === 'text') {
-            layers.push({
-                type: 'text',
-                index,
-                placement: layer.placement,
-                content: layer.content,
-                font: layer.font,
-                fontLabel: DESIGN_FONTS[layer.font] ?? layer.font,
-                color: layer.color,
-                outline: layer.outline,
-                align: layer.align,
-            })
-            continue
-        }
-        number += 1
-        layers.push({
-            type: 'image',
-            index,
-            number,
-            placement: layer.placement,
-            format: layer.format,
-            width: layer.width,
-            height: layer.height,
-            bytes: layer.bytes,
-            dpi: layer.dpi,
-            dpiLevel: dpiLevel(layer.dpi),
-            downloadPath: adminDesignPath(code, item.id, `originals/${number}`),
-            viewPath: adminDesignPath(code, item.id, `originals/${number}/view`),
-            downloadName: originalFilename(code, line, number, layer.format),
-        })
-    }
-    const artwork = design?.assets?.find((asset) => asset.kind === 'artwork') ?? null
-    const dpi = design?.dpiEstimate ?? null
-    return {
-        id: item.designId,
-        previewPath: adminDesignPath(code, item.id, 'preview'),
-        color: designColorOf(design),
-        printSize: design?.printSize ?? null,
-        dpiEstimate: dpi,
-        dpiLevel: dpi === null ? null : dpiLevel(dpi),
-        layers,
-        artwork: artwork
-            ? {
-                  path: adminDesignPath(code, item.id, 'artwork'),
-                  downloadName: artworkFilename(code, line),
-                  width: artwork.width,
-                  height: artwork.height,
-                  bytes: artwork.bytes,
-                  dpi: artwork.dpi ?? null,
-              }
-            : null,
-    }
-}
-
-function toAdminItem(item: OrderItem, code: string): AdminOrderItemDto {
-    return {
-        ...toItem(item, code),
-        id: item.id,
-        design: toAdminDesign(item, code),
-    }
+function toAdminItem(item: OrderItem): AdminOrderItemDto {
+    return { ...toItem(item), id: item.id }
 }
 
 function toTotals(order: Order): OrderTotalsDto {
@@ -491,7 +325,7 @@ export function toPublicOrder(
         canSubmitPayment: canSubmitPayment(order),
         receiptAvailable: hasReceipt(order, order.payments ?? []),
         customer: toCustomer(order),
-        items: sortedItems(order).map((item) => toItem(item, order.code)),
+        items: sortedItems(order).map(toItem),
         totals: toTotals(order),
         pagoMovil,
         payments: sortByDate(order.payments ?? [])
@@ -562,7 +396,7 @@ export function toAdminOrder(
               }
             : null,
         customer: toCustomer(order),
-        items: sortedItems(order).map((item) => toAdminItem(item, order.code)),
+        items: sortedItems(order).map(toAdminItem),
         totals: toTotals(order),
         payments: sortByDate(order.payments ?? [])
             .reverse()

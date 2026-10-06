@@ -85,17 +85,17 @@ describe('SlidingWindowLimiter', () => {
 
 describe('bot helpers', () => {
     it('normalizes order codes', () => {
-        expect(normalizeOrderCode('MR-000012')).toBe('MR-000012')
-        expect(normalizeOrderCode('mr12')).toBe('MR-000012')
-        expect(normalizeOrderCode(' 12 ')).toBe('MR-000012')
-        expect(normalizeOrderCode('MR-1234567')).toBe('MR-1234567')
+        expect(normalizeOrderCode('KZ-000012')).toBe('KZ-000012')
+        expect(normalizeOrderCode('kz12')).toBe('KZ-000012')
+        expect(normalizeOrderCode(' 12 ')).toBe('KZ-000012')
+        expect(normalizeOrderCode('KZ-1234567')).toBe('KZ-1234567')
         expect(normalizeOrderCode('pedido')).toBeNull()
         expect(normalizeOrderCode('')).toBeNull()
     })
 
     it('only uses URL buttons Telegram accepts', () => {
-        expect(isButtonUrl('https://manadarusso.com/admin/pedidos/MR-000001')).toBe(true)
-        expect(isButtonUrl('http://localhost:5173/admin/pedidos/MR-000001')).toBe(false)
+        expect(isButtonUrl('https://kaizen.com/admin/pedidos/KZ-000001')).toBe(true)
+        expect(isButtonUrl('http://localhost:5173/admin/pedidos/KZ-000001')).toBe(false)
         expect(isButtonUrl('http://127.0.0.1:5173/x')).toBe(false)
         expect(isButtonUrl('http://intranet/x')).toBe(false)
         expect(isButtonUrl('javascript:alert(1)')).toBe(false)

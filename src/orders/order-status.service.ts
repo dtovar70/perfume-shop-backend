@@ -100,12 +100,12 @@ function units(count: number): string {
     return count === 1 ? '1 unidad' : `${count} unidades`
 }
 
-/** "Franela X – Talla M" (just the product name on lines without a variant). */
+/** "Yara – 100 ml" (just the product name on lines without a variant). */
 export function stockLineName(line: StockConflictLine): string {
     return stockItemName(line.productName, line.variantLabel)
 }
 
-/** "«Franela X – Talla M» pidió 3, hay 1" for each line. */
+/** "«Yara – 100 ml» pidió 3, hay 1" for each line. */
 export function describeStockLines(lines: readonly StockConflictLine[]): string {
     return lines
         .map((line) => `«${stockLineName(line)}» pidió ${line.requested}, hay ${line.available}`)

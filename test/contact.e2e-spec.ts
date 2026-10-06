@@ -23,7 +23,7 @@ describe('Contact form without Telegram (e2e)', () => {
     const form = (overrides: Record<string, unknown> = {}) => ({
         fullName: 'Ana Pérez',
         email: 'ana@example.com',
-        topic: 'personalizado',
+        topic: 'asesoria',
         message: 'Quiero 20 tazas con el logo de mi empresa.',
         ...overrides,
     })

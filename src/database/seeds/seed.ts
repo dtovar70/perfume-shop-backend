@@ -1,5 +1,5 @@
 /**
- * Idempotent seed: admin user + categories + catalog copied from the frontend mocks.
+ * Idempotent seed: admin user + categories + brands + the KaiZen starter perfume catalog.
  * Run with `npm run db:seed` (after `npm run db:migrate`).
  */
 import argon2 from 'argon2'
@@ -8,12 +8,14 @@ import { passwordPolicyErrors } from '../../auth/password-policy.js'
 import { Role } from '../../auth/role.enum.js'
 import { passwordChangeInstant } from '../../auth/session.config.js'
 import { feminine } from '../../common/validation/messages.js'
+import { Brand } from '../../brands/entities/brand.entity.js'
 import { Category } from '../../categories/entities/category.entity.js'
 import { ProductVariant } from '../../products/entities/product-variant.entity.js'
 import { Product } from '../../products/entities/product.entity.js'
 import { computeDerivedFields } from '../../products/product-derived.js'
 import dataSource from '../data-source.js'
 import { newId } from '../id.js'
+import { brands } from './seed-data/brands.data.js'
 import { categories } from './seed-data/categories.data.js'
 import { products } from './seed-data/products.data.js'
 
@@ -68,17 +70,21 @@ async function seedCategories(): Promise<void> {
     console.log(`  categories: ${categories.length}`)
 }
 
-/**
- * The seed data keeps one stock per product (copied from the frontend mock): it is shared out
- * evenly across the variants, the first ones taking the remainder, so the sum stays the same.
- */
-function splitStock(total: number, count: number, index: number): number {
-    return Math.floor(total / count) + (index < total % count ? 1 : 0)
+async function seedBrands(): Promise<void> {
+    await dataSource.getRepository(Brand).upsert(
+        brands.map((brand, sortOrder) => ({ ...brand, logoUrl: null, sortOrder, isActive: true })),
+        ['slug'],
+    )
+    console.log(`  brands: ${brands.length}`)
 }
 
 async function seedProducts(): Promise<void> {
+    const brandNames = new Map(brands.map((brand) => [brand.slug, brand.name]))
     for (const product of products) {
-        const { id, category, variants, compareAtPrice, createdAt, ...fields } = product
+        const { id, brand, category, variants, compareAtPrice, createdAt, ...fields } = product
+        const stock = variants.length
+            ? variants.reduce((sum, variant) => sum + variant.stock, 0)
+            : product.stock
 
         await dataSource.transaction(async (manager) => {
             await manager.upsert(
@@ -86,10 +92,12 @@ async function seedProducts(): Promise<void> {
                 {
                     id,
                     ...fields,
+                    stock,
+                    brandSlug: brand,
                     categorySlug: category,
                     compareAtPrice: compareAtPrice ?? null,
                     createdAt: new Date(createdAt),
-                    ...computeDerivedFields(product),
+                    ...computeDerivedFields({ ...product, brandName: brandNames.get(brand) }),
                 },
                 ['id'],
             )
@@ -98,12 +106,8 @@ async function seedProducts(): Promise<void> {
                 await manager.insert(
                     ProductVariant,
                     variants.map((variant, sortOrder) => ({
-                        id: variant.id,
+                        ...variant,
                         productId: id,
-                        label: variant.label,
-                        priceDelta: variant.priceDelta,
-                        colorHex: variant.colorHex ?? null,
-                        stock: splitStock(product.stock, variants.length, sortOrder),
                         sortOrder,
                     })),
                 )
@@ -119,6 +123,7 @@ async function main(): Promise<void> {
     try {
         await seedAdmin()
         await seedCategories()
+        await seedBrands()
         await seedProducts()
         console.log('Seed completed.')
     } finally {

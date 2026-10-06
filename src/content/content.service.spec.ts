@@ -196,7 +196,7 @@ describe('ContentService', () => {
             bankName: 'Banco de Venezuela',
             phone: '0412-5550134',
             idNumber: 'J-123456789',
-            holderName: 'Manada Russo C.A.',
+            holderName: 'KaiZen C.A.',
             instructions: '',
         }
         await expect(service.update('payment', payment, USER)).resolves.toBeDefined()
@@ -212,7 +212,7 @@ describe('ContentService', () => {
             bankName: 'Banco de Venezuela',
             phone: '0412-5550134',
             idNumber: 'V-12345678',
-            holderName: 'Manada Russo',
+            holderName: 'KaiZen',
             instructions: '',
         }
         for (const idNumber of [
@@ -245,7 +245,7 @@ describe('ContentService', () => {
             bankName: 'Banco',
             phone: '0426-1234567',
             idNumber: 'V-12345678',
-            holderName: 'Manada Russo',
+            holderName: 'KaiZen',
             instructions: '',
         }
         expect(await detailsOf(service.update('payment', payment, USER))).toEqual([
@@ -279,7 +279,7 @@ describe('ContentService', () => {
             bankName: 'Otro nombre',
             phone: '0412-5550134',
             idNumber: 'V-12345678',
-            holderName: 'Manada Russo',
+            holderName: 'KaiZen',
             instructions: '',
         }
         await service.update('payment', payment, USER)
@@ -333,8 +333,13 @@ describe('ContentService', () => {
             {
                 ...DEFAULT_SITE_CONTENT.home,
                 testimonials: [
-                    { quote: '  Me encantó mi taza  ', name: 'Ana', city: 'Valencia', product: '' },
-                    { quote: 'Llegó rapidísimo', name: ' Luis ', city: '', product: 'Franela' },
+                    {
+                        quote: '  Me encantó mi perfume  ',
+                        name: 'Ana',
+                        city: 'Valencia',
+                        product: '',
+                    },
+                    { quote: 'Llegó rapidísimo', name: ' Luis ', city: '', product: 'Khamrah' },
                 ],
             },
             USER,
@@ -342,8 +347,8 @@ describe('ContentService', () => {
         const [, params] = entries.query.mock.calls[0] as [string, unknown[]]
         expect((JSON.parse(params[1] as string) as { testimonials: unknown }).testimonials).toEqual(
             [
-                { quote: 'Me encantó mi taza', name: 'Ana', city: 'Valencia', product: '' },
-                { quote: 'Llegó rapidísimo', name: 'Luis', city: '', product: 'Franela' },
+                { quote: 'Me encantó mi perfume', name: 'Ana', city: 'Valencia', product: '' },
+                { quote: 'Llegó rapidísimo', name: 'Luis', city: '', product: 'Khamrah' },
             ],
         )
     })
@@ -413,7 +418,7 @@ describe('ContentService', () => {
 
         const home = {
             ...DEFAULT_SITE_CONTENT.home,
-            heroTitle: 'Tazas *que hablan por ti',
+            heroTitle: 'Perfumes *que hablan por ti',
             heroBadge: 'Hola {marca}',
         }
         expect(await detailsOf(service.update('home', home, USER))).toEqual([
@@ -453,7 +458,7 @@ describe('ContentService', () => {
                 {
                     ...DEFAULT_SITE_CONTENT.contact,
                     phone: '+58 412 555 0134',
-                    instagram: '@manada',
+                    instagram: '@kaizen',
                 },
                 USER,
             ),

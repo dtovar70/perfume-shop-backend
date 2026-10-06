@@ -3,7 +3,7 @@ export function normalizeText(value: string): string {
     return value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
-/** URL-safe slug from free text: "Taza Café Primero" -> "taza-cafe-primero". */
+/** URL-safe slug from free text: "Café Árabe Intenso" -> "cafe-arabe-intenso". */
 export function slugify(value: string): string {
     return normalizeText(value)
         .replace(/[^a-z0-9]+/g, '-')

@@ -86,7 +86,7 @@ export class AuthService {
             .where('LOWER(user.email) = :email', { email: normalized })
             .getOne()
 
-        this.dummyHash ??= argon2.hash('manada-russo-timing-guard')
+        this.dummyHash ??= argon2.hash('kaizen-timing-guard')
         const hash = user?.passwordHash ?? (await this.dummyHash)
         const valid = await argon2.verify(hash, password).catch(() => false)
 

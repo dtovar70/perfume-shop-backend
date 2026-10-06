@@ -19,8 +19,6 @@ import { Role } from '../auth/role.enum.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import { Roles } from '../common/decorators/roles.decorator.js'
 import type { AuthUser } from '../common/types/auth-user.js'
-import { DesignsService } from '../designs/designs.service.js'
-import { downloadPrivateFile, sendPrivateFile } from '../designs/send-private-file.js'
 import {
     AdminOrdersService,
     type AdminOrderListDto,
@@ -48,7 +46,6 @@ export class AdminOrdersController {
         private readonly access: OrderAccessService,
         private readonly receipts: ReceiptService,
         private readonly whatsapp: OrderWhatsAppService,
-        private readonly designs: DesignsService,
     ) {}
 
     @Get()
@@ -192,57 +189,5 @@ export class AdminOrdersController {
         res.setHeader('X-Content-Type-Options', 'nosniff')
         access.stream.on('error', () => res.destroy())
         access.stream.pipe(res)
-    }
-
-    /** The mockup preview of a line's own design (stream, or a short-lived signed redirect). */
-    @Get(':code/items/:itemId/design/preview')
-    async designPreview(
-        @Param('code') code: string,
-        @Param('itemId') itemId: string,
-        @Res() res: Response,
-    ): Promise<void> {
-        const file = await this.designs.fileForAdmin(code, itemId, { kind: 'preview' })
-        sendPrivateFile(res, file.access)
-    }
-
-    /** The print-ready "arte final" (transparent PNG), named `MR-000123-linea1-arte-final.png`. */
-    @Get(':code/items/:itemId/design/artwork')
-    async designArtwork(
-        @Param('code') code: string,
-        @Param('itemId') itemId: string,
-        @Res() res: Response,
-    ): Promise<void> {
-        const file = await this.designs.fileForAdmin(code, itemId, { kind: 'artwork' })
-        await downloadPrivateFile(res, file.access, file.downloadName)
-    }
-
-    /** The original of image `number` (1-based), named `MR-000123-linea1-imagen1.jpg`. */
-    @Get(':code/items/:itemId/design/originals/:number')
-    async designOriginal(
-        @Param('code') code: string,
-        @Param('itemId') itemId: string,
-        @Param('number') number: string,
-        @Res() res: Response,
-    ): Promise<void> {
-        const file = await this.designs.fileForAdmin(code, itemId, {
-            kind: 'original',
-            number: Number(number),
-        })
-        await downloadPrivateFile(res, file.access, file.downloadName)
-    }
-
-    /** The same original shown inline (the admin's thumbnails). */
-    @Get(':code/items/:itemId/design/originals/:number/view')
-    async designOriginalView(
-        @Param('code') code: string,
-        @Param('itemId') itemId: string,
-        @Param('number') number: string,
-        @Res() res: Response,
-    ): Promise<void> {
-        const file = await this.designs.fileForAdmin(code, itemId, {
-            kind: 'original',
-            number: Number(number),
-        })
-        sendPrivateFile(res, file.access)
     }
 }

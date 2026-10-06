@@ -25,8 +25,8 @@ function setup(overdue: Pick<Order, 'id' | 'code'>[]) {
 describe('OrderExpiryService', () => {
     it('expires every unpaid order past its deadline through the status service', async () => {
         const { service, find, transition } = setup([
-            { id: '1', code: 'MR-000001' },
-            { id: '2', code: 'MR-000002' },
+            { id: '1', code: 'KZ-000001' },
+            { id: '2', code: 'KZ-000002' },
         ])
         const now = new Date('2026-09-24T12:00:00Z')
 
@@ -34,13 +34,13 @@ describe('OrderExpiryService', () => {
         const [firstQuery] = find.mock.calls[0] as [{ where: { status: string } }]
         expect(firstQuery.where.status).toBe('PENDIENTE_PAGO')
         expect(transition).toHaveBeenCalledWith(
-            'MR-000001',
+            'KZ-000001',
             'EXPIRADO',
             { kind: 'system' },
             EXPIRY_NOTE,
         )
         expect(transition).toHaveBeenCalledWith(
-            'MR-000002',
+            'KZ-000002',
             'EXPIRADO',
             { kind: 'system' },
             EXPIRY_NOTE,
@@ -49,8 +49,8 @@ describe('OrderExpiryService', () => {
 
     it('skips an order paid in the meantime (the transition no longer applies)', async () => {
         const { service, transition } = setup([
-            { id: '1', code: 'MR-000001' },
-            { id: '2', code: 'MR-000002' },
+            { id: '1', code: 'KZ-000001' },
+            { id: '2', code: 'KZ-000002' },
         ])
         transition.mockRejectedValueOnce(new ConflictException('paid'))
 

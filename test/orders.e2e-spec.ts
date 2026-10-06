@@ -84,7 +84,7 @@ describe('Orders (e2e)', () => {
         })
         const signer = new JwtService({ secret: app.get(ConfigService).get<string>('JWT_SECRET') })
         cookie = (user) =>
-            `mr_session=${signer.sign({ sub: USERS[user].id, role: USERS[user].role }, { expiresIn: 600 })}`
+            `kz_session=${signer.sign({ sub: USERS[user].id, role: USERS[user].role }, { expiresIn: 600 })}`
     })
 
     afterEach(async () => {
@@ -102,7 +102,7 @@ describe('Orders (e2e)', () => {
             accessToken: string
             order: Row & { totals: Row; items: Row[] }
         }
-        expect(code).toBe('MR-000001')
+        expect(code).toBe('KZ-000001')
         expect(accessToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
         // (12.90 + 3.10) x 2 = 32.00 < 35 -> + 4.00 shipping.
         expect(order.totals).toMatchObject({
@@ -113,7 +113,7 @@ describe('Orders (e2e)', () => {
             exchangeRate: 854.4637,
         })
         expect(order.items[0]).toMatchObject({
-            productName: 'Taza Café Primero',
+            productName: 'Lattafa Khamrah',
             variantLabel: '15 oz',
             unitPriceUsd: 16,
             quantity: 2,
@@ -169,7 +169,7 @@ describe('Orders (e2e)', () => {
             .expect(400)
         expect(stock.body.code).toBe('ORDER_ITEMS_INVALID')
         expect(stock.body.details).toEqual([
-            { field: 'items.0', errors: ['Solo queda 1 unidad de «Franela – M».'] },
+            { field: 'items.0', errors: ['Solo queda 1 unidad de «Khamrah – M».'] },
             { field: 'items.1', errors: ['«Oculto» ya no está disponible.'] },
         ])
         expect(stock.body.lines[0]).toMatchObject({ index: 0, available: 1 })
@@ -212,7 +212,7 @@ describe('Orders (e2e)', () => {
             .get(`/api/orders/${body.code}?t=${'x'.repeat(43)}`)
             .expect(404)
         await request(app.getHttpServer())
-            .get(`/api/orders/MR-999999?t=${body.accessToken}`)
+            .get(`/api/orders/KZ-999999?t=${body.accessToken}`)
             .expect(404)
     })
 
@@ -484,7 +484,7 @@ describe('Orders (e2e)', () => {
                 {
                     productId: 'tee-001',
                     variantId: 'v-m',
-                    productName: 'Franela',
+                    productName: 'Khamrah',
                     variantLabel: 'M',
                     requested: 1,
                     available: 0,
@@ -493,7 +493,7 @@ describe('Orders (e2e)', () => {
             ],
         })
         expect(detail.body.history.at(-1).note).toBe(
-            'Pago hecho después del plazo, según la fecha indicada. Stock insuficiente: «Franela – M» pidió 1, hay 0.',
+            'Pago hecho después del plazo, según la fecha indicada. Stock insuficiente: «Khamrah – M» pidió 1, hay 0.',
         )
 
         const unacknowledged = await admin(order.code, '/transitions', 'editor', {
@@ -510,7 +510,7 @@ describe('Orders (e2e)', () => {
         expect(confirmed.body.status).toBe('PAGO_VERIFICADO')
         expect(confirmed.body.stockConflict.resolvedAt).not.toBeNull()
         expect(confirmed.body.history.at(-1).note).toBe(
-            'Pago confirmado con stock insuficiente: «Franela – M» faltan 1 unidad.',
+            'Pago confirmado con stock insuficiente: «Khamrah – M» faltan 1 unidad.',
         )
         expect(db.stock('tee-001')).toBe(0)
 
@@ -573,7 +573,7 @@ describe('Orders (e2e)', () => {
         expect(refused.body).toMatchObject({
             code: 'STOCK_INSUFFICIENT',
             message:
-                'No hay stock suficiente para reactivar el pedido: «Franela – M» pidió 1, hay 0.',
+                'No hay stock suficiente para reactivar el pedido: «Khamrah – M» pidió 1, hay 0.',
         })
         expect(orderRow(order.code).status).toBe('EXPIRADO')
 
@@ -585,7 +585,7 @@ describe('Orders (e2e)', () => {
         expect(new Date(forced.body.paymentDueAt).getTime()).toBeGreaterThan(Date.now())
         expect(forced.body.stockConflict.lines[0]).toMatchObject({ requested: 1, available: 0 })
         expect(forced.body.history.at(-1).note).toBe(
-            'Pedido reactivado con un nuevo plazo de pago. Stock insuficiente: «Franela – M» pidió 1, hay 0.',
+            'Pedido reactivado con un nuevo plazo de pago. Stock insuficiente: «Khamrah – M» pidió 1, hay 0.',
         )
         expect(db.stock('tee-001')).toBe(0)
 
@@ -599,7 +599,7 @@ describe('Orders (e2e)', () => {
     })
 
     describe('stock per variant', () => {
-        const MUG = 'Taza Café Primero'
+        const MUG = 'Lattafa Khamrah'
 
         it('adds up the lines of one variant and names it when it is short', async () => {
             const short = await request(app.getHttpServer())
@@ -609,12 +609,7 @@ describe('Orders (e2e)', () => {
                         items: [
                             { productId: 'mug-001', variantId: 'v-15oz', quantity: 3 },
                             { productId: 'mug-001', variantId: 'v-11oz', quantity: 3 },
-                            {
-                                productId: 'mug-001',
-                                variantId: 'v-15oz',
-                                quantity: 3,
-                                personalization: 'Ana',
-                            },
+                            { productId: 'mug-001', variantId: 'v-15oz', quantity: 3 },
                         ],
                     }),
                 )
@@ -631,7 +626,7 @@ describe('Orders (e2e)', () => {
             await createOrder([
                 { productId: 'mug-001', variantId: 'v-15oz', quantity: 2 },
                 { productId: 'mug-001', variantId: 'v-11oz', quantity: 1 },
-                { productId: 'mug-001', variantId: 'v-15oz', quantity: 2, personalization: 'Ana' },
+                { productId: 'mug-001', variantId: 'v-15oz', quantity: 2 },
             ])
             expect(db.variantStock('v-15oz')).toBe(1)
             expect(db.variantStock('v-11oz')).toBe(2)
@@ -676,7 +671,7 @@ describe('Orders (e2e)', () => {
                 .send(checkout({ items: [{ productId: 'key-001', quantity: 2 }] }))
                 .expect(400)
             expect(short.body.details).toEqual([
-                { field: 'items.0', errors: ['Solo queda 1 unidad de «Llavero».'] },
+                { field: 'items.0', errors: ['Solo queda 1 unidad de «Asad».'] },
             ])
 
             await admin(order.code, '/transitions', 'admin', {
@@ -824,7 +819,7 @@ describe('Orders (e2e)', () => {
             }).expect(400)
             expect(refused.body.code).toBe('STOCK_CONFLICT_UNACKNOWLEDGED')
             expect(refused.body.message).toBe(
-                'Falta stock para este pedido («Franela – M» pidió 2, hay 1). Confirma que lo entiendes para continuar.',
+                'Falta stock para este pedido («Khamrah – M» pidió 2, hay 1). Confirma que lo entiendes para continuar.',
             )
             expect(refused.body.lines).toMatchObject([{ variantId: 'v-m', available: 1 }])
             expect(db.variantStock('v-m')).toBe(1)
@@ -838,7 +833,7 @@ describe('Orders (e2e)', () => {
                 reserved: 1,
             })
             expect(confirmed.body.history.at(-1).note).toBe(
-                'Pago confirmado con stock insuficiente: «Franela – M» faltan 1 unidad.',
+                'Pago confirmado con stock insuficiente: «Khamrah – M» faltan 1 unidad.',
             )
             expect(db.variantStock('v-m')).toBe(0)
         })
@@ -904,8 +899,8 @@ describe('Orders (e2e)', () => {
         )
     })
 
-    it('stores a trimmed personalization per item, up to 140 characters', async () => {
-        const created = await request(app.getHttpServer())
+    it('refuses the retired personalization and design fields on a cart line', async () => {
+        const refused = await request(app.getHttpServer())
             .post('/api/orders')
             .send(
                 checkout({
@@ -914,44 +909,19 @@ describe('Orders (e2e)', () => {
                             productId: 'mug-001',
                             variantId: 'v-11oz',
                             quantity: 1,
-                            personalization: '  Feliz cumple, Ana  ',
-                        },
-                        {
-                            productId: 'mug-001',
-                            variantId: 'v-11oz',
-                            quantity: 1,
-                            personalization: 'Luis',
-                        },
-                        { productId: 'mug-001', variantId: 'v-11oz', quantity: 1 },
-                    ],
-                }),
-            )
-            .expect(201)
-        expect(created.body.order.items.map((item: Row) => item.personalization)).toEqual([
-            'Feliz cumple, Ana',
-            'Luis',
-            null,
-        ])
-        const tooLong = await request(app.getHttpServer())
-            .post('/api/orders')
-            .send(
-                checkout({
-                    items: [
-                        {
-                            productId: 'mug-001',
-                            variantId: 'v-11oz',
-                            quantity: 1,
-                            personalization: 'x'.repeat(141),
+                            personalization: 'Ana',
+                            designId: 'd1',
                         },
                     ],
                 }),
             )
             .expect(400)
-        expect(tooLong.body.details).toEqual([
+        expect(refused.body.details).toEqual([
             {
                 field: 'items.0.personalization',
-                errors: ['El texto personalizado no puede superar los 140 caracteres.'],
+                errors: ['El campo "personalization" no está permitido.'],
             },
+            { field: 'items.0.designId', errors: ['El campo "designId" no está permitido.'] },
         ])
     })
 
@@ -1141,9 +1111,9 @@ describe('Orders (e2e)', () => {
     })
 
     it('keeps the admin API behind a session', async () => {
-        await request(app.getHttpServer()).get('/api/admin/orders/MR-000001').expect(401)
+        await request(app.getHttpServer()).get('/api/admin/orders/KZ-000001').expect(401)
         await request(app.getHttpServer())
-            .get('/api/admin/orders/MR-000001/payments/p/proof')
+            .get('/api/admin/orders/KZ-000001/payments/p/proof')
             .expect(401)
         await request(app.getHttpServer())
             .post('/api/admin/exchange-rate/manual')
@@ -1167,7 +1137,7 @@ describe('Orders (e2e)', () => {
 
         it('returns the same order for a retry, taking the stock once', async () => {
             const first = await post(checkout(), KEY).expect(201)
-            expect(first.body).toMatchObject({ code: 'MR-000001', replayed: false })
+            expect(first.body).toMatchObject({ code: 'KZ-000001', replayed: false })
             expect(db.variantStock('v-15oz')).toBe(3)
             expect(db.table(Order)[0]).toMatchObject({ idempotencyKey: KEY })
             expect(db.table(Order)[0]?.idempotencyHash).toMatch(/^[a-f0-9]{64}$/)
@@ -1177,7 +1147,7 @@ describe('Orders (e2e)', () => {
             // Same body, other key order and email case: the same request.
             const { items, ...rest } = checkout({ email: 'ANA@example.com' })
             const retry = await post({ items, ...rest }, KEY).expect(200)
-            expect(retry.body).toMatchObject({ code: 'MR-000001', replayed: true })
+            expect(retry.body).toMatchObject({ code: 'KZ-000001', replayed: true })
             expect(retry.body.order).toEqual(first.body.order)
             expect(retry.body.accessToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
             expect(retry.body.accessToken).not.toBe(first.body.accessToken)
@@ -1188,7 +1158,7 @@ describe('Orders (e2e)', () => {
             // Both links open the order.
             for (const token of [first.body.accessToken, retry.body.accessToken]) {
                 await request(app.getHttpServer())
-                    .get(`/api/orders/MR-000001?t=${token}`)
+                    .get(`/api/orders/KZ-000001?t=${token}`)
                     .expect(200)
             }
         })
@@ -1208,7 +1178,7 @@ describe('Orders (e2e)', () => {
         it('creates one order per request without the header, as before', async () => {
             const first = await post(checkout()).expect(201)
             const second = await post(checkout(), '').expect(201)
-            expect([first.body.code, second.body.code]).toEqual(['MR-000001', 'MR-000002'])
+            expect([first.body.code, second.body.code]).toEqual(['KZ-000001', 'KZ-000002'])
             expect(second.body.replayed).toBe(false)
             expect(db.variantStock('v-15oz')).toBe(1)
             expect(db.table(Order).map((order) => order.idempotencyKey)).toEqual([null, null])
@@ -1264,7 +1234,7 @@ describe('Orders (e2e)', () => {
 
             const retry = await post(checkout(), KEY).expect(200)
             expect(missed).toBe(true)
-            expect(retry.body).toMatchObject({ code: 'MR-000001', replayed: true })
+            expect(retry.body).toMatchObject({ code: 'KZ-000001', replayed: true })
             expect(db.table(Order)).toHaveLength(1)
             // The losing transaction took stock and inserted rows; all of it was rolled back.
             expect(db.variantStock('v-15oz')).toBe(3)
@@ -1275,7 +1245,7 @@ describe('Orders (e2e)', () => {
             await post(checkout(), KEY).expect(201)
             db.table(Order)[0]!.createdAt = new Date(Date.now() - 25 * 60 * 60_000)
             const later = await post(checkout({ address: 'Otra dirección 123' }), KEY).expect(201)
-            expect(later.body).toMatchObject({ code: 'MR-000002', replayed: false })
+            expect(later.body).toMatchObject({ code: 'KZ-000002', replayed: false })
             expect(db.table(Order).map((order) => order.idempotencyKey)).toEqual([null, KEY])
             expect(db.variantStock('v-15oz')).toBe(1)
         })

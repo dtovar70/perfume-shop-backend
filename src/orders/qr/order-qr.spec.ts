@@ -14,7 +14,7 @@ function decodeQrPng(png: Buffer): string | null {
 }
 
 const URL_WITH_TOKEN =
-    'https://manadarusso.com/pedido/MR-000012?t=Q2hvY29sYXRlLWNha2UtaXMtdGhlLWJlc3QtY2FrZS0x'
+    'https://kaizen.com/pedido/KZ-000012?t=Q2hvY29sYXRlLWNha2UtaXMtdGhlLWJlc3QtY2FrZS0x'
 
 describe('order QR', () => {
     it('renders a PNG that decodes back to the private order link', async () => {

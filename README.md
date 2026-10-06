@@ -1,6 +1,7 @@
-# Manada Russo Creativa — API
+# KaiZen Perfumería — API
 
-NestJS + TypeORM + PostgreSQL backend for the `frontend-cups` storefront.
+NestJS + TypeORM + PostgreSQL backend for the `frontend-perfume-shop` storefront (KaiZen, a perfume
+store in Venezuela: USD prices, BCV Bs conversion and Pago Móvil).
 Phase 1: admin auth with roles, products/categories CRUD, image uploads.
 Phase 2: editable site content (texts and business data) edited from the admin.
 Phase 3: guest orders, the BCV exchange rate and Pago Móvil payments verified by hand.
@@ -25,7 +26,7 @@ npm run start:dev           # http://localhost:3000/api
 
 The container publishes Postgres on host port **5440** so it does not clash with locally
 installed PostgreSQL servers (5432/5433 on WSL or Windows). `DATABASE_URL` must use the same port
-(`postgresql://manada:manada@localhost:5440/manada_russo`). Set `POSTGRES_PORT` to use another one.
+(`postgresql://kaizen:kaizen@localhost:5440/kaizen`). Set `POSTGRES_PORT` to use another one.
 
 Images are stored on **Cloudinary** when all `CLOUDINARY_*` variables are set, otherwise on
 **local disk** (`./uploads`, served at `/uploads`). The active driver is logged at startup.
@@ -66,7 +67,7 @@ in `src/database/database.options.ts`; `synchronize` can silently drop columns a
 100 characters (`TEXT_INPUT_MAX_LENGTH`, `@MaxInputLength` in `src/common/validation/text-limits.ts`),
 and its column is `varchar(100)`. Multi-line fields keep their own limit, enforced by the DTO and a
 `char_length` CHECK: product description 4000, category description 1000, order notes 300,
-personalization 140, rejection reason 500, internal notes 1000. `products.highlights` holds at most 6
+brand description 1000, rejection reason 500, internal notes 1000. `products.highlights` holds at most 6
 items of up to 100 characters (CHECKs through `max_text_array_item_length(text[])`). Site content is
 jsonb, so its limits live only in the content DTOs.
 
@@ -109,16 +110,23 @@ dependency). Never run `db:seed` in production: it loads the demo catalog.
 Public:
 
 - `GET /health`
-- `GET /products?category&search&sort&minPrice&maxPrice&tags&page&pageSize` → `Paginated<Product>`
-  (`sort`: `relevance | price-asc | price-desc | newest | rating`; `tags` comma-separated or repeated;
-  `pageSize` default 12, max 48; search is accent-insensitive)
-- `GET /products/featured?limit` (`limit` 1–24, default 8)
+- `GET /products?category&search&sort&minPrice&maxPrice&tags&brand&gender&concentration&family&page&pageSize`
+  → `Paginated<Product>` (`sort`: `relevance | price-asc | price-desc | newest | name-asc`, a retired
+  `rating` falls back to relevance; `tags` and `brand` comma-separated or repeated; `gender`:
+  `mujer | hombre | unisex`; `concentration`: `EDC | EDT | EDP | PARFUM | EXTRAIT`; `family` matches
+  the olfactory family ignoring case; `pageSize` default 12, max 48; search is accent-insensitive and
+  covers name, description, brand, gender, concentration, family, notes and tags)
+- `GET /products/featured?limit` (`limit` 1–24, default 8): `isFeatured` products first, then by
+  relevance
+- `GET /products/facets?category` → `{ priceMin, priceMax, brands[{ slug, name, count }],
+genders[{ value, count }], families[…], concentrations[…] }` over the active products
+- `GET /brands` → active brands (`sortOrder`, then name) with `productCount` of active products
 - `GET /products/:slug`
 - `GET /products/:slug/related?limit` (`limit` 1–12, default 4; same category first, then the rest)
 - `GET /categories` (in `sortOrder` order, with `productCount` of active products)
 - `GET /content` → every site-content section (see [Site content](#site-content))
 
-Auth (session = httpOnly cookie `mr_session`):
+Auth (session = httpOnly cookie `kz_session`):
 
 - `POST /auth/login` `{ email, password }` (rate-limited to 5/min) → user + `session`. The email
   is matched ignoring case. A deactivated account gets the same `401` "Correo o contraseña
@@ -142,7 +150,7 @@ front refreshes the session in the background. The token and cookie last idle mi
 seconds + 60 s (`src/auth/session.config.ts`), so the server session never ends before the
 prompt does. Tokens issued with a longer lifetime (e.g. the old 7-day ones) are rejected.
 
-Admin (roles `ADMIN` or `EDITOR`; deleting products or categories requires `ADMIN`):
+Admin (roles `ADMIN` or `EDITOR`; deleting products, categories or brands requires `ADMIN`):
 
 - `GET /admin/products?search&category&isActive&page&pageSize`, `GET /admin/products/:id`
 - `POST /admin/products`, `PATCH /admin/products/:id` (partial; `variants` replaces the list)
@@ -164,6 +172,19 @@ Admin (roles `ADMIN` or `EDITOR`; deleting products or categories requires `ADMI
 - `DELETE /admin/categories/:slug` (ADMIN only; `409` while the category has any product, active
   or hidden, `204` otherwise). The `products.category_slug` foreign key is `ON DELETE RESTRICT`, so
   deleting a category can never delete its products.
+- `GET /admin/brands`, `GET /admin/brands/:slug` (every brand, with `sortOrder`, `isActive` and
+  `totalProductCount`)
+- `POST /admin/brands`, `PATCH /admin/brands/:slug` — JSON or multipart `{ name, slug?, logoUrl?,
+description?, sortOrder?, isActive? }` plus an optional `logo` image (JPG/PNG/WEBP, 2 MB), stored
+  like the product photos; a new logo or `logoUrl` (null clears it) replaces an uploaded one, which
+  is then deleted. The slug cannot change.
+- `DELETE /admin/brands/:slug` (ADMIN only, `204`): its products stay, without a brand (`ON DELETE
+SET NULL`).
+
+Product perfume fields (create/update): `brandSlug` (or null), `gender` (`mujer | hombre | unisex`,
+default `unisex`), `concentration` (`EDC | EDT | EDP | PARFUM | EXTRAIT` or null), `volumeMl`,
+`notesTop` / `notesHeart` / `notesBase` (up to 12 notes of 60 characters each), `olfactoryFamily`,
+`isFeatured` (+20 relevance) and a unique `sku`. Variants take an optional `volumeMl`.
 
 ## Site content
 
@@ -186,7 +207,7 @@ admin edits them at `/admin/contenido`.
   shipped with. No rows are seeded; `GET` merges the stored value of each section over its
   defaults field by field, so a section nobody edited, or a field added later, renders the
   default. Unknown or mistyped stored fields are ignored. The storefront keeps an identical copy
-  (`frontend-cups/src/configs/content.defaults.ts`) as its offline fallback: keep both in sync.
+  (`frontend-perfume-shop/src/configs/content.defaults.ts`) as its offline fallback: keep both in sync.
 - **Text conventions.** Words between asterisks are highlighted in headings (`Tus *favoritos*`).
   Placeholders are replaced when rendered, and each field only accepts its own:
   `{envioGratis}` (threshold, `$35`), `{tarifaEnvio}` (flat rate), `{produccion}` (production copy),
@@ -274,7 +295,7 @@ tone?, whatsappTemplate? }` (only the admin catalog carries `whatsappTemplate`),
 Guest checkout (no customer accounts). Code in `src/orders`, rates in `src/exchange-rate`.
 
 **Flow.** The storefront sends the checkout form and the cart lines (`productId`, `variantId?`,
-`quantity`, `personalization?` trimmed, up to 140 characters, kept in the item snapshot); any other field (e.g. a price) is a `400`. The API locks the
+`quantity`); any other field (e.g. a price) is a `400`. The API locks the
 product rows (`SELECT … FOR UPDATE`), checks that each product is active, the variant exists and
 the stock is enough (per-line Spanish errors, `400 ORDER_ITEMS_INVALID` with `details` and
 `lines[{ index, available, message }]`), recomputes unit price (price + variant `priceDelta`),
@@ -482,7 +503,7 @@ connection never blocks the boot: Telegram or network errors are logged and retr
   production uses a webhook: create a second bot for development, or set `TELEGRAM_ENABLED=false`.
 - **Webhook** (production, e.g. Railway): set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
   (e.g. `openssl rand -hex 32`), `PUBLIC_API_URL` (the public HTTPS address of the API, e.g.
-  `https://manada-api.up.railway.app`) and, if you want to be explicit, `TELEGRAM_MODE=webhook`.
+  `https://kaizen-api.up.railway.app`) and, if you want to be explicit, `TELEGRAM_MODE=webhook`.
   At startup the API calls `setWebhook(<PUBLIC_API_URL>/api/telegram/webhook)` with the secret.
   `POST /api/telegram/webhook` is public and not throttled; it answers 401 unless the
   `X-Telegram-Bot-Api-Secret-Token` header matches. Run a single instance (the pending-reason and
@@ -570,7 +591,7 @@ logged with its context (order code or user id, never the address or the body) a
 | `smtp`          | Any SMTP server: Mailpit in development (`SMTP_HOST`, `SMTP_PORT`; `SMTP_USER`/`SMTP_PASS` optional) |
 | `resend`        | Resend's HTTP API (`POST https://api.resend.com/emails`, `Authorization: Bearer RESEND_API_KEY`)     |
 
-`MAIL_FROM` ("Manada Russo Creativa <pedidos@tudominio.com>") is required by `smtp` and `resend`
+`MAIL_FROM` ("KaiZen Perfumería <pedidos@tudominio.com>") is required by `smtp` and `resend`
 (on Resend it must be on a verified domain); `MAIL_REPLY_TO` is optional (customers' replies go
 there). The startup validation lists any missing variable. Under `NODE_ENV=test` the driver is
 always `log` (the e2e tests replace the `MAIL_TRANSPORT` provider with a fake).
@@ -581,7 +602,7 @@ always `log` (the e2e tests replace the `MAIL_TRANSPORT` provider with a fake).
 
 ```dotenv
 MAIL_DRIVER=smtp
-MAIL_FROM="Manada Russo Creativa <pedidos@manadarusso.test>"
+MAIL_FROM="KaiZen Perfumería <pedidos@kaizen.test>"
 SMTP_HOST=localhost
 SMTP_PORT=1025
 ```
@@ -593,7 +614,7 @@ brand name and the contact data of the site content (email, WhatsApp, Instagram)
 Every customer value is escaped.
 
 - **Pedido recibido** (`order.created`, `OrderEmailsListener`, after the commit): greeting, code,
-  items (variant, quantity, personalization), totals in USD and Bs with the stored rate, the Pago
+  items (variant and quantity), totals in USD and Bs with the stored rate, the Pago
   Móvil data with the exact amount, the payment deadline in Caracas time, the delivery method and
   address, a **Ver mi pedido** button and how to reach the shop (reply or WhatsApp). The button
   carries a **new** private link (`order_access_links`, `created_by` null), never the checkout

@@ -104,7 +104,7 @@ export class OrderWhatsAppService {
             envio: shippingNote
                 ? withoutFinalPunctuation(shippingNote)
                 : order.deliveryMethod === 'pickup'
-                  ? 'retiro en el taller'
+                  ? 'retiro en tienda'
                   : `a domicilio, ${[order.address, order.city].filter(Boolean).join(', ')}`,
             comprobante: receiptUrl ?? '',
         }

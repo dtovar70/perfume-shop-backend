@@ -4,7 +4,7 @@ import { toWhatsAppPhone } from '../orders/whatsapp/whatsapp-template.js'
 /**
  * A tiny email builder: the content is a list of blocks rendered twice, as table-based HTML with
  * inline CSS (what email clients understand) and as its plain-text alternative. Every value is
- * escaped here, so templates pass raw user data (names, personalization, addresses).
+ * escaped here, so templates pass raw user data (names, notes, addresses).
  */
 
 /** Plain text, a bold part, or a link. */
@@ -235,7 +235,7 @@ export function renderEmail(input: EmailLayoutInput): RenderedEmail {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${COLOR.blush};">
 <tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;font-family:${FONT};">
-<tr><td align="center" style="padding:8px 0 20px 0;font-size:24px;font-weight:700;color:${COLOR.accent};letter-spacing:0.3px;">🐾 ${brand}</td></tr>
+<tr><td align="center" style="padding:8px 0 20px 0;font-size:24px;font-weight:700;color:${COLOR.accent};letter-spacing:0.3px;">✨ ${brand}</td></tr>
 <tr><td style="background:${COLOR.white};border-radius:24px;padding:28px 24px 12px 24px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${body}</table>
 </td></tr>

@@ -6,7 +6,7 @@ export interface AvailabilityRequestItem {
 
 /**
  * Live availability of one cart line, in request order. Matches `CartAvailability` in
- * frontend-cups/src/@types/cart.ts.
+ * frontend-perfume-shop/src/@types/cart.ts.
  */
 export interface AvailabilityDto {
     productId: string

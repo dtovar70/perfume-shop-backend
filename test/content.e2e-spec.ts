@@ -73,7 +73,7 @@ describe('Site content (e2e)', () => {
 
         const signer = new JwtService({ secret: app.get(ConfigService).get<string>('JWT_SECRET') })
         cookie = (user) =>
-            `mr_session=${signer.sign({ sub: USERS[user].id, role: USERS[user].role }, { expiresIn: 600 })}`
+            `kz_session=${signer.sign({ sub: USERS[user].id, role: USERS[user].role }, { expiresIn: 600 })}`
     })
 
     afterEach(async () => {

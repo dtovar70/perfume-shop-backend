@@ -13,7 +13,7 @@ import {
 
 const MESSAGE = {
     to: 'ana@example.com',
-    subject: 'Recibimos tu pedido MR-000001',
+    subject: 'Recibimos tu pedido KZ-000001',
     html: '<p>Hola</p>',
     text: 'Hola',
 }
@@ -181,7 +181,7 @@ describe('SmtpMailTransport (nodemailer)', () => {
         expect(sent!.data).toMatch(/^From: Tienda <pedidos@example\.com>$/m)
         expect(sent!.data).toMatch(/^Reply-To: hola@example\.com$/m)
         expect(sent!.data).toMatch(/^To: ana@example\.com$/m)
-        expect(sent!.data).toMatch(/^Subject: Recibimos tu pedido MR-000001$/m)
+        expect(sent!.data).toMatch(/^Subject: Recibimos tu pedido KZ-000001$/m)
         expect(sent!.data).toContain('text/plain')
         expect(sent!.data).toContain('text/html')
     })

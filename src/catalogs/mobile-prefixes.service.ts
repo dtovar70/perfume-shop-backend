@@ -37,12 +37,12 @@ const CONTENT_FIELD_REASONS: Record<ContentPhoneField, string> = {
     'contact.whatsapp': 'es el WhatsApp de contacto',
 }
 
-/** Matches `MobilePrefix` in frontend-cups/src/@types/catalog.ts. */
+/** Matches `MobilePrefix` in frontend-perfume-shop/src/@types/catalog.ts. */
 export interface MobilePrefixDto {
     code: string
 }
 
-/** Matches `AdminMobilePrefix` in frontend-cups/src/@types/catalog.ts. */
+/** Matches `AdminMobilePrefix` in frontend-perfume-shop/src/@types/catalog.ts. */
 export interface AdminMobilePrefixDto extends MobilePrefixDto {
     isActive: boolean
     sortOrder: number

@@ -21,7 +21,7 @@ import { OrderStatusGroup } from './entities/order-status-group.entity.js'
 export const ORDER_STATUS_NOT_FOUND = 'No encontramos ese estado de pedido.'
 export const ORDER_STATUS_GROUP_NOT_FOUND = 'No encontramos esa pestaña de pedidos.'
 
-/** Matches `OrderStatusInfo` in frontend-cups/src/@types/catalog.ts. */
+/** Matches `OrderStatusInfo` in frontend-perfume-shop/src/@types/catalog.ts. */
 export interface OrderStatusDto {
     code: string
     label: string
@@ -39,7 +39,7 @@ export interface AdminOrderStatusDto extends OrderStatusDto {
     whatsappTemplate: string
 }
 
-/** Matches `OrderStatusGroupInfo` in frontend-cups/src/@types/catalog.ts. */
+/** Matches `OrderStatusGroupInfo` in frontend-perfume-shop/src/@types/catalog.ts. */
 export interface OrderStatusGroupDto {
     code: string
     label: string

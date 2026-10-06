@@ -1,7 +1,7 @@
 import type { Response } from 'express'
 import type { ReceiptFile } from './receipt.service.js'
 
-/** Sends the receipt as a download (`comprobante-MR-000012.pdf`), never cached. */
+/** Sends the receipt as a download (`comprobante-KZ-000012.pdf`), never cached. */
 export function sendReceipt(res: Response, file: ReceiptFile): void {
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Length', String(file.content.length))

@@ -67,7 +67,6 @@ describe('Customer emails: "Pedido recibido" and "Consultar mi pedido" (e2e)', (
                             productId: 'mug-001',
                             variantId: 'v-15oz',
                             quantity: 2,
-                            personalization: 'Ñandú <3',
                         },
                     ],
                     ...overrides,
@@ -121,11 +120,9 @@ describe('Customer emails: "Pedido recibido" and "Consultar mi pedido" (e2e)', (
             expect(email!.to).toBe('ana@example.com')
             expect(email!.subject).toBe(`Recibimos tu pedido ${order.code}`)
             expect(email!.text).toContain('¡GRACIAS POR TU PEDIDO, ANA!')
-            expect(email!.text).toContain('Taza Café Primero · 15 oz — $32,00')
-            expect(email!.text).toContain('Personalización: “Ñandú <3”')
+            expect(email!.text).toContain('Lattafa Khamrah · 15 oz — $32,00')
             expect(email!.text).toContain('Banco: 0134 - Banesco')
             expect(email!.text).toContain('Dirección: Av. Principal, casa 4, Caracas')
-            expect(email!.html).toContain('Ñandú &lt;3')
 
             const { url, token } = linkOf(email!)
             expect(url).toContain(`/pedido/${order.code}?t=`)
@@ -182,7 +179,7 @@ describe('Customer emails: "Pedido recibido" and "Consultar mi pedido" (e2e)', (
             mail.sent = []
 
             const wrongEmail = await lookup(order.code, 'otra@example.com').expect(202)
-            const unknownCode = await lookup('MR-999999', 'ana@example.com').expect(202)
+            const unknownCode = await lookup('KZ-999999', 'ana@example.com').expect(202)
             expect(wrongEmail.body).toEqual(LOOKUP_REQUESTED)
             expect(unknownCode.body).toEqual(LOOKUP_REQUESTED)
             await lookups.idle()
@@ -204,21 +201,21 @@ describe('Customer emails: "Pedido recibido" and "Consultar mi pedido" (e2e)', (
             expect(bad.body.details).toEqual([
                 {
                     field: 'code',
-                    errors: ['El código del pedido debe tener el formato MR-000123.'],
+                    errors: ['El código del pedido debe tener el formato KZ-000123.'],
                 },
                 {
                     field: 'email',
                     errors: ['El correo debe ser un correo válido, por ejemplo hola@correo.com.'],
                 },
             ])
-            await http().post('/api/orders/lookup').send({ code: 'MR-000001' }).expect(400)
+            await http().post('/api/orders/lookup').send({ code: 'KZ-000001' }).expect(400)
         })
 
         it('limits lookups to 3 per email and 3 per code every 15 minutes', async () => {
             for (let index = 0; index < 3; index++) {
-                await lookup(`MR-00000${index + 1}`, 'ana@example.com').expect(202)
+                await lookup(`KZ-00000${index + 1}`, 'ana@example.com').expect(202)
             }
-            const limited = await lookup('MR-000009', 'ANA@example.com').expect(429)
+            const limited = await lookup('KZ-000009', 'ANA@example.com').expect(429)
             expect(limited.body.message).toBe(
                 'Hiciste muchas consultas seguidas. Espera unos minutos e intenta de nuevo.',
             )
@@ -227,17 +224,17 @@ describe('Customer emails: "Pedido recibido" and "Consultar mi pedido" (e2e)', (
 
         it('limits lookups per code across emails', async () => {
             for (let index = 0; index < 3; index++) {
-                await lookup('MR-000001', `persona${index}@example.com`).expect(202)
+                await lookup('KZ-000001', `persona${index}@example.com`).expect(202)
             }
-            await lookup('mr-000001', 'otra@example.com').expect(429)
+            await lookup('kz-000001', 'otra@example.com').expect(429)
             await lookups.idle()
         })
 
         it('limits lookups to 5 per IP every 15 minutes', async () => {
             for (let index = 0; index < 5; index++) {
-                await lookup(`MR-00001${index}`, `persona${index}@example.com`).expect(202)
+                await lookup(`KZ-00001${index}`, `persona${index}@example.com`).expect(202)
             }
-            await lookup('MR-000020', 'otra@example.com').expect(429)
+            await lookup('KZ-000020', 'otra@example.com').expect(429)
             await lookups.idle()
         })
     })

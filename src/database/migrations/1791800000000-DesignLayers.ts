@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { MigrationInterface, QueryRunner } from 'typeorm'
-import type { DesignLayer } from '../../designs/design-layers.js'
 import {
     layeredToLegacy,
     legacyToLayered,
+    type DesignLayer,
     type LayeredAssetRow,
     type LegacyDesignRow,
-} from '../../designs/design-legacy.js'
+} from './support/design-legacy.js'
 
 /**
  * "Diseña con tu imagen", Stage 2: layers (up to 5 images and 3 texts) and a print-ready file.

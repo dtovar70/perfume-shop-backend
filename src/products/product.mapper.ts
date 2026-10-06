@@ -1,16 +1,30 @@
 import type { Product } from './entities/product.entity.js'
-import type { ProductTag } from './products.constants.js'
+import type { ProductGender, ProductTag } from './products.constants.js'
 
-/** A product loaded with its `variants` and `images` relations (see ProductRepository). */
+/** A product loaded with its `brand`, `variants` and `images` relations (see ProductRepository). */
 export type ProductWithRelations = Product
 
 export interface ProductVariantDto {
     id: string
     label: string
     priceDelta: number
-    colorHex?: string
+    /** Bottle size of this version, in ml; null when the variant is not a size. */
+    volumeMl: number | null
     /** Units of this version in stock (the product's `stock` is the sum of its variants). */
     stock: number
+}
+
+export interface ProductBrandDto {
+    slug: string
+    name: string
+    logoUrl: string | null
+}
+
+/** Olfactory pyramid. */
+export interface ProductNotesDto {
+    top: string[]
+    heart: string[]
+    base: string[]
 }
 
 export interface ProductImageDto {
@@ -19,7 +33,7 @@ export interface ProductImageDto {
     alt: string | null
 }
 
-/** Matches `Product` in frontend-cups/src/@types/product.ts, plus `images`. */
+/** Matches `Product` in frontend-perfume-shop/src/@types/product.ts, plus `images`. */
 export interface PublicProductDto {
     id: string
     slug: string
@@ -27,8 +41,14 @@ export interface PublicProductDto {
     category: string
     price: number
     compareAtPrice?: number
-    printText: string
-    colorHex: string
+    brand: ProductBrandDto | null
+    gender: ProductGender
+    concentration: string | null
+    volumeMl: number | null
+    notes: ProductNotesDto
+    olfactoryFamily: string | null
+    isFeatured: boolean
+    sku: string | null
     description: string
     highlights: string[]
     variants: ProductVariantDto[]
@@ -59,15 +79,23 @@ export function toPublicProduct(product: ProductWithRelations): PublicProductDto
         category: product.categorySlug,
         price: product.price,
         ...(product.compareAtPrice !== null && { compareAtPrice: product.compareAtPrice }),
-        printText: product.printText,
-        colorHex: product.colorHex,
+        brand: product.brand
+            ? { slug: product.brand.slug, name: product.brand.name, logoUrl: product.brand.logoUrl }
+            : null,
+        gender: product.gender,
+        concentration: product.concentration,
+        volumeMl: product.volumeMl,
+        notes: { top: product.notesTop, heart: product.notesHeart, base: product.notesBase },
+        olfactoryFamily: product.olfactoryFamily,
+        isFeatured: product.isFeatured,
+        sku: product.sku,
         description: product.description,
         highlights: product.highlights,
         variants: product.variants.map((variant) => ({
             id: variant.id,
             label: variant.label,
             priceDelta: variant.priceDelta,
-            ...(variant.colorHex !== null && { colorHex: variant.colorHex }),
+            volumeMl: variant.volumeMl,
             stock: variant.stock,
         })),
         tags: product.tags as ProductTag[],

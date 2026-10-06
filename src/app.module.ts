@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { AuthModule } from './auth/auth.module.js'
 import { PasswordResetModule } from './auth/password-reset/password-reset.module.js'
+import { BrandsModule } from './brands/brands.module.js'
 import { CatalogsModule } from './catalogs/catalogs.module.js'
 import { CategoriesModule } from './categories/categories.module.js'
 import { TOO_MANY_REQUESTS_MESSAGE } from './common/http/throttle.js'
@@ -37,6 +38,7 @@ import { UsersModule } from './users/users.module.js'
         AuthModule,
         ProductsModule,
         CategoriesModule,
+        BrandsModule,
         CatalogsModule,
         ContentModule,
         ExchangeRateModule,

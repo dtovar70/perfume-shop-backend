@@ -53,7 +53,7 @@ function download(url: string): Promise<string> {
                 method: 'GET',
                 ca: BCV_TRUSTED_CAS,
                 timeout: TIMEOUT_MS,
-                headers: { 'User-Agent': 'ManadaRusso/1.0 (+tasa BCV)', Accept: 'text/html' },
+                headers: { 'User-Agent': 'KaiZen/1.0 (+tasa BCV)', Accept: 'text/html' },
             },
             (res) => {
                 if (res.statusCode !== 200) {

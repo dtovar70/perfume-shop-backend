@@ -24,7 +24,7 @@ function conflict(lines: Partial<StockConflictLine>[], resolvedAt: string | null
         lines: lines.map((line) => ({
             productId: 'key',
             variantId: 'key-mint',
-            productName: 'Llavero acrílico',
+            productName: 'Asad Edición',
             variantLabel: 'Menta',
             requested: 1,
             available: 0,

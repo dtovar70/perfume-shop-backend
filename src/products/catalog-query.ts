@@ -1,6 +1,11 @@
 import type { ObjectLiteral, SelectQueryBuilder } from 'typeorm'
 import { normalizeText } from '../common/utils/text.util.js'
-import type { ProductTag, SortOption } from './products.constants.js'
+import type {
+    ProductConcentration,
+    ProductGender,
+    ProductTag,
+    SortOption,
+} from './products.constants.js'
 
 /** Query alias used for the `Product` entity in every catalog query. */
 export const PRODUCT_ALIAS = 'product'
@@ -11,6 +16,12 @@ export interface CatalogFilters {
     minPrice?: number
     maxPrice?: number
     tags?: ProductTag[]
+    /** Brand slugs: a product of any of them matches. */
+    brand?: string[]
+    gender?: ProductGender
+    concentration?: ProductConcentration
+    /** Olfactory family, compared ignoring case. */
+    family?: string
 }
 
 /** A parameterized WHERE fragment. User input only ever travels in `params`. */
@@ -68,6 +79,30 @@ export function buildCatalogConditions(filters: CatalogFilters): Condition[] {
             params: { tags: filters.tags },
         })
     }
+    if (filters.brand?.length) {
+        conditions.push({
+            clause: `${PRODUCT_ALIAS}.brandSlug IN (:...brands)`,
+            params: { brands: filters.brand },
+        })
+    }
+    if (filters.gender) {
+        conditions.push({
+            clause: `${PRODUCT_ALIAS}.gender = :gender`,
+            params: { gender: filters.gender },
+        })
+    }
+    if (filters.concentration) {
+        conditions.push({
+            clause: `${PRODUCT_ALIAS}.concentration = :concentration`,
+            params: { concentration: filters.concentration },
+        })
+    }
+    if (filters.family) {
+        conditions.push({
+            clause: `LOWER(${PRODUCT_ALIAS}.olfactoryFamily) = LOWER(:family)`,
+            params: { family: filters.family },
+        })
+    }
 
     return [...conditions, ...buildSearchConditions(filters.search)]
 }
@@ -94,7 +129,17 @@ export const CATALOG_ORDER_BY: Record<SortOption, OrderBy> = {
         [`${PRODUCT_ALIAS}.createdAt`, 'DESC'],
         [`${PRODUCT_ALIAS}.id`, 'ASC'],
     ],
+    'name-asc': [
+        [`${PRODUCT_ALIAS}.name`, 'ASC'],
+        [`${PRODUCT_ALIAS}.id`, 'ASC'],
+    ],
 }
+
+/** `GET /products/featured`: products marked as featured first, then by relevance. */
+export const FEATURED_ORDER_BY: OrderBy = [
+    [`${PRODUCT_ALIAS}.isFeatured`, 'DESC'],
+    ...CATALOG_ORDER_BY.relevance,
+]
 
 export function applyConditions<T extends ObjectLiteral>(
     query: SelectQueryBuilder<T>,

@@ -111,7 +111,7 @@ export class AdminTelegramService {
         try {
             await api.sendMessage(
                 chat.chatId,
-                `👋 ¡Hola! Este es un mensaje de prueba de Manada Russo, enviado por ${user.name} desde el panel. Si lo ves, los avisos llegan bien ✅`,
+                `👋 ¡Hola! Este es un mensaje de prueba de KaiZen, enviado por ${user.name} desde el panel. Si lo ves, los avisos llegan bien ✅`,
             )
         } catch (error) {
             this.logger.warn(
@@ -139,7 +139,7 @@ export class AdminTelegramService {
             await api
                 .sendMessage(
                     chat.chatId,
-                    '👋 Este chat fue desvinculado desde el panel de Manada Russo. Ya no recibirás avisos de pagos.',
+                    '👋 Este chat fue desvinculado desde el panel de KaiZen. Ya no recibirás avisos de pagos.',
                 )
                 .catch(() => undefined)
         }

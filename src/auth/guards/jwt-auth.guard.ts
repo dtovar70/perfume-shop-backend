@@ -20,7 +20,7 @@ const SESSION_REVOKED = 'Tu sesión ya no es válida. Inicia sesión de nuevo.'
 const PASSWORD_CHANGED = 'Tu contraseña cambió. Inicia sesión de nuevo con la nueva contraseña.'
 
 /**
- * Global guard: every route requires a valid `mr_session` cookie unless marked @Public().
+ * Global guard: every route requires a valid `kz_session` cookie unless marked @Public().
  * The user is re-read from the database on every request, so a deactivation, a role change
  * or a password change (which rejects older tokens) applies immediately.
  */

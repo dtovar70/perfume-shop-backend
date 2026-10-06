@@ -14,8 +14,6 @@ export const ORDER_FIELD = {
     productId: masculine('El producto'),
     variantId: feminine('La variante'),
     quantity: feminine('La cantidad'),
-    personalization: masculine('El texto personalizado'),
-    designId: masculine('El diseño'),
     reference: feminine('La referencia'),
     payerBankCode: masculine('El banco'),
     payerPhone: masculine('El teléfono del pago'),
@@ -41,7 +39,6 @@ export const ORDER_LIMITS = {
     notes: 300,
     items: 50,
     quantity: 99,
-    personalization: 140,
     reason: 500,
     note: 1000,
     search: 100,
@@ -63,5 +60,5 @@ export const PAYER_ID_PATTERN = ID_NUMBER_PATTERN
  */
 export const REFERENCE_DIGITS = 6
 export const REFERENCE_PATTERN = /^\d{6}$/
-export const ORDER_CODE_PATTERN = /^MR-\d{6,}$/
+export const ORDER_CODE_PATTERN = /^KZ-\d{6,}$/
 export const MAX_AMOUNT_BS = 9_999_999_999.99

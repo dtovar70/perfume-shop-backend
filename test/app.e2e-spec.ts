@@ -69,7 +69,7 @@ describe('App (e2e)', () => {
     it('GET /api/admin/products with an invalid session is rejected', () => {
         return request(app.getHttpServer())
             .get('/api/admin/products')
-            .set('Cookie', 'mr_session=not-a-jwt')
+            .set('Cookie', 'kz_session=not-a-jwt')
             .expect(401)
     })
 

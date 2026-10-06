@@ -55,7 +55,7 @@ describe('Auth session (e2e)', () => {
 
     const nowSeconds = () => Math.floor(Date.now() / 1000)
     const cookieFor = (claims: Record<string, unknown>) =>
-        `mr_session=${signer.sign({ role: Role.ADMIN, ...claims })}`
+        `kz_session=${signer.sign({ role: Role.ADMIN, ...claims })}`
 
     beforeEach(async () => {
         const moduleFixture = await Test.createTestingModule({ imports: [AppModule] })
@@ -142,7 +142,7 @@ describe('Auth session (e2e)', () => {
         expect(body.session.expiresInSeconds).toBeGreaterThanOrEqual(ttlSeconds - 1)
 
         const setCookie = ([] as string[]).concat(response.headers['set-cookie'] ?? [])
-        const session = setCookie.find((cookie) => cookie.startsWith('mr_session='))
+        const session = setCookie.find((cookie) => cookie.startsWith('kz_session='))
         expect(session).toBeDefined()
         expect(session).toMatch(/HttpOnly/i)
         expect(session).toMatch(new RegExp(`Max-Age=(${ttlSeconds}|${ttlSeconds - 1});`))

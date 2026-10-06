@@ -11,9 +11,9 @@ import {
 } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { Public } from '../common/decorators/public.decorator.js'
-import { CatalogService } from './catalog.service.js'
+import { CatalogService, type CatalogFacetsDto } from './catalog.service.js'
 import { AvailabilityQueryDto } from './dto/availability.dto.js'
-import { CatalogQueryDto } from './dto/catalog-query.dto.js'
+import { CatalogQueryDto, FacetsQueryDto } from './dto/catalog-query.dto.js'
 import { FeaturedQueryDto, RelatedQueryDto } from './dto/limit-query.dto.js'
 import type { AvailabilityDto } from './product-availability.js'
 import type { Paginated, PublicProductDto } from './product.mapper.js'
@@ -29,6 +29,12 @@ export class CatalogController {
     @Get()
     list(@Query() query: CatalogQueryDto): Promise<Paginated<PublicProductDto>> {
         return this.catalog.list(query)
+    }
+
+    /** Filter values with their product counts, and the price range (declared before ":slug"). */
+    @Get('facets')
+    facets(@Query() query: FacetsQueryDto): Promise<CatalogFacetsDto> {
+        return this.catalog.facets(query.category)
     }
 
     // Declared before ":slug" so "featured" is not treated as a slug.

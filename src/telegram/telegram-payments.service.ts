@@ -2,17 +2,12 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectDataSource } from '@nestjs/typeorm'
 import { GrammyError, InlineKeyboard, InputFile } from 'grammy'
-import type { InputMediaPhoto, Message } from 'grammy/types'
+import type { Message } from 'grammy/types'
 import type { Readable } from 'node:stream'
 import { DataSource } from 'typeorm'
 import { User } from '../auth/entities/user.entity.js'
 import { OrderStatusCatalogService } from '../catalogs/order-status-catalog.service.js'
 import type { Env } from '../config/env.schema.js'
-import {
-    DesignsService,
-    type DesignImage,
-    type DesignPrintFile,
-} from '../designs/designs.service.js'
 import { AdminOrdersService } from '../orders/admin-orders.service.js'
 import { OrderPayment } from '../orders/entities/order-payment.entity.js'
 import { Order } from '../orders/entities/order.entity.js'
@@ -21,11 +16,8 @@ import type { TelegramMessage } from './entities/telegram-message.entity.js'
 import { encodeCallback } from './telegram-callbacks.js'
 import { TelegramBotService } from './telegram-bot.service.js'
 import {
-    designTextLine,
     escapeHtml,
-    fitCaption,
     formatCaracasTime,
-    garmentColorText,
     newOrderMessage,
     paymentMessage,
     TELEGRAM_CAPTION_LIMIT,
@@ -35,11 +27,6 @@ import {
     type PaymentMessageData,
 } from './telegram-format.js'
 import { TelegramStoreService, type NewTelegramMessage } from './telegram-store.service.js'
-
-/** Telegram's limit of photos per album (sendMediaGroup). */
-const MAX_ALBUM_PHOTOS = 10
-/** Print files sent per order (an arte final and up to 5 originals per design line). */
-const MAX_DESIGN_DOCUMENTS = 40
 
 /** Largest proof the bot downloads to forward (Telegram accepts photos up to 10 MB). */
 const MAX_PROOF_BYTES = 10 * 1024 * 1024
@@ -135,7 +122,6 @@ export class TelegramPaymentsService {
         private readonly catalog: OrderStatusCatalogService,
         private readonly adminOrders: AdminOrdersService,
         private readonly whatsapp: OrderWhatsAppService,
-        private readonly designs: DesignsService,
         config: ConfigService<Env, true>,
     ) {
         this.siteUrl = config.get('PUBLIC_SITE_URL', { infer: true })
@@ -160,7 +146,7 @@ export class TelegramPaymentsService {
         if (!payment) return null
         const order = await this.dataSource
             .getRepository(Order)
-            .findOne({ where: { id: payment.orderId }, relations: { items: { design: true } } })
+            .findOne({ where: { id: payment.orderId }, relations: { items: true } })
         if (!order) return null
         const items = [...(order.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
         return {
@@ -398,132 +384,6 @@ export class TelegramPaymentsService {
         if (!context?.pending) return
         const chatIds = chats.map((chat) => chat.chatId)
         await this.sendPayment(context, chatIds, { withProof: true })
-        await this.sendDesigns(context.order, chatIds)
-    }
-
-    /**
-     * The previews of the order's own designs ("Diseño propio"), after the payment: one photo, or
-     * an album (up to 10), each caption listing the design's texts. Then the print files as
-     * documents (see `sendDesignPrintFiles`). Uploaded once; the other chats reuse Telegram's
-     * file ids. Never throws.
-     */
-    async sendDesigns(order: Order, chatIds: readonly string[]): Promise<number> {
-        const api = this.telegram.api
-        if (!api || !chatIds.length || !(order.items ?? []).some((item) => item.designId)) {
-            return 0
-        }
-        let images: DesignImage[]
-        try {
-            images = (await this.designs.previewImagesForOrder(order.id)).slice(0, MAX_ALBUM_PHOTOS)
-        } catch (error) {
-            this.logger.warn(`Could not read the designs of ${order.code}: ${String(error)}`)
-            images = []
-        }
-
-        const url = this.adminUrl(order.code)
-        const panelLine = isButtonUrl(url) ? null : `🔗 Panel: ${escapeHtml(url)}`
-        const caption = (image: DesignImage, first: boolean) => {
-            const variant = image.variantLabel ? ` (${escapeHtml(image.variantLabel)})` : ''
-            const required = [
-                `🎨 <b>Diseño propio</b> · <b>${escapeHtml(order.code)}</b> · línea ${image.line}`,
-                `${escapeHtml(truncate(image.productName, 60))}${variant}`,
-                ...(image.color ? [garmentColorText(image.color)] : []),
-                ...(first && panelLine ? [panelLine] : []),
-            ]
-            return fitCaption(required, image.texts.map(designTextLine))
-        }
-        let media: (string | InputFile)[] = images.map(
-            (image) => new InputFile(image.buffer, image.filename),
-        )
-        let delivered = 0
-        for (const chatId of images.length ? chatIds : []) {
-            if (images.length === 1) {
-                const keyboard = isButtonUrl(url)
-                    ? new InlineKeyboard().url('🔗 Ver en el panel', url)
-                    : undefined
-                const sent = await this.deliver(chatId, 'sendPhoto (design)', () =>
-                    api.sendPhoto(chatId, media[0]!, {
-                        caption: caption(images[0]!, true),
-                        parse_mode: 'HTML',
-                        reply_markup: keyboard,
-                    }),
-                )
-                if (!sent) continue
-                media = [sent.photo?.at(-1)?.file_id ?? media[0]!]
-                delivered++
-                continue
-            }
-            const album: InputMediaPhoto[] = images.map((image, index) => ({
-                type: 'photo',
-                media: media[index]!,
-                caption: caption(image, index === 0),
-                parse_mode: 'HTML',
-            }))
-            const sent = await this.deliver(chatId, 'sendMediaGroup (designs)', () =>
-                api.sendMediaGroup(chatId, album),
-            )
-            if (!sent) continue
-            media = media.map((current, index) => {
-                const message = sent[index]
-                const fileId =
-                    message && 'photo' in message ? message.photo?.at(-1)?.file_id : undefined
-                return fileId ?? current
-            })
-            delivered++
-        }
-        await this.sendDesignPrintFiles(order, chatIds)
-        return delivered
-    }
-
-    /**
-     * The print files, as documents (Telegram does not recompress documents), so the owner
-     * always has them in the chat: for each design line the "arte final" first, then the
-     * original of each image. Each file is read once (one at a time), uploaded to the first chat
-     * that takes it, and the other chats reuse its file id. Never throws.
-     */
-    private async sendDesignPrintFiles(order: Order, chatIds: readonly string[]): Promise<void> {
-        const api = this.telegram.api
-        if (!api) return
-        let files: DesignPrintFile[]
-        try {
-            files = (await this.designs.printFilesForOrder(order.id, order.code)).slice(
-                0,
-                MAX_DESIGN_DOCUMENTS,
-            )
-        } catch (error) {
-            this.logger.warn(`Could not list the design files of ${order.code}: ${String(error)}`)
-            return
-        }
-
-        const code = escapeHtml(order.code)
-        const caption = (file: DesignPrintFile) => {
-            const head =
-                file.kind === 'artwork'
-                    ? `🖨️ <b>Arte final para imprimir</b> · <b>${code}</b> · línea ${file.line}`
-                    : `📎 <b>Original ${file.number ?? ''} para imprimir</b> · <b>${code}</b> · línea ${file.line}`
-            return fitCaption([head], [escapeHtml(truncate(file.productName, 60))])
-        }
-        for (const file of files) {
-            let media: string | InputFile | null = null
-            for (const chatId of chatIds) {
-                if (!media) {
-                    const buffer = await file.load()
-                    if (!buffer) break
-                    media = new InputFile(buffer, file.filename)
-                }
-                const current: string | InputFile = media
-                const sent: Message.DocumentMessage | null = await this.deliver(
-                    chatId,
-                    `sendDocument (design ${file.kind})`,
-                    () =>
-                        api.sendDocument(chatId, current, {
-                            caption: caption(file),
-                            parse_mode: 'HTML',
-                        }),
-                )
-                if (sent?.document?.file_id) media = sent.document.file_id
-            }
-        }
     }
 
     /** `order.created`: a short notice to the chats that asked for new orders. */
@@ -534,7 +394,7 @@ export class TelegramPaymentsService {
         if (!chats.length) return
         const order = await this.dataSource
             .getRepository(Order)
-            .findOne({ where: { id: orderId }, relations: { items: { design: true } } })
+            .findOne({ where: { id: orderId }, relations: { items: true } })
         if (!order) return
         const items = [...(order.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
         const url = this.adminUrl(order.code)
