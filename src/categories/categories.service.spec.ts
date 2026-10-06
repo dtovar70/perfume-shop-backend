@@ -71,8 +71,8 @@ describe('CategoriesService.create', () => {
 
     it('rejects a slug that is already taken with a Spanish 409', async () => {
         const { service, categories } = setup({ exists: true })
-        await expect(service.create({ ...INPUT, slug: 'mujer' })).rejects.toThrow(
-            new ConflictException('Ya existe una categoría con el slug "mujer".'),
+        await expect(service.create({ ...INPUT, slug: 'europeos' })).rejects.toThrow(
+            new ConflictException('Ya existe una categoría con el slug "europeos".'),
         )
         expect(categories.insert).not.toHaveBeenCalled()
     })
@@ -102,13 +102,13 @@ describe('CategoriesService.remove', () => {
 
     it('refuses while the category has products, active or hidden, and says how many', async () => {
         const { service, categories, products } = setup({ exists: true, productCount: 6 })
-        await expect(service.remove('mujer')).rejects.toThrow(
+        await expect(service.remove('europeos')).rejects.toThrow(
             new ConflictException(
                 'No puedes eliminar esta categoría porque tiene 6 productos. Muévelos a otra categoría o elimínalos primero.',
             ),
         )
         // No `isActive` filter: hidden products also block the delete.
-        expect(products.countBy).toHaveBeenCalledWith({ categorySlug: 'mujer' })
+        expect(products.countBy).toHaveBeenCalledWith({ categorySlug: 'europeos' })
         expect(categories.delete).not.toHaveBeenCalled()
     })
 
@@ -154,26 +154,26 @@ function setupReorder(existing: string[]) {
 
 describe('CategoriesService.reorder', () => {
     it('writes positions 0..n-1 in the given order inside one transaction', async () => {
-        const { service, categories, manager } = setupReorder(['mujer', 'hombre', 'unisex'])
-        await service.reorder(['unisex', 'mujer', 'hombre'])
+        const { service, categories, manager } = setupReorder(['arabes', 'europeos', 'sets-regalo'])
+        await service.reorder(['sets-regalo', 'arabes', 'europeos'])
 
         expect(categories.manager.transaction).toHaveBeenCalledTimes(1)
         expect(manager.update.mock.calls.map((call) => [call[1], call[2]])).toEqual([
-            [{ slug: 'unisex' }, { sortOrder: 0 }],
-            [{ slug: 'mujer' }, { sortOrder: 1 }],
-            [{ slug: 'hombre' }, { sortOrder: 2 }],
+            [{ slug: 'sets-regalo' }, { sortOrder: 0 }],
+            [{ slug: 'arabes' }, { sortOrder: 1 }],
+            [{ slug: 'europeos' }, { sortOrder: 2 }],
         ])
         // Returns the refreshed admin list.
         expect(categories.find).toHaveBeenCalled()
     })
 
     it.each([
-        ['a missing category', ['mujer', 'hombre']],
-        ['an unknown slug', ['mujer', 'hombre', 'arabes']],
-        ['a repeated slug', ['mujer', 'hombre', 'hombre']],
-        ['an extra slug', ['mujer', 'hombre', 'unisex', 'arabes']],
+        ['a missing category', ['arabes', 'europeos']],
+        ['an unknown slug', ['arabes', 'europeos', 'nicho']],
+        ['a repeated slug', ['arabes', 'europeos', 'europeos']],
+        ['an extra slug', ['arabes', 'europeos', 'sets-regalo', 'nicho']],
     ])('refuses a list with %s with a Spanish 400 and writes nothing', async (_, slugs) => {
-        const { service, manager } = setupReorder(['mujer', 'hombre', 'unisex'])
+        const { service, manager } = setupReorder(['arabes', 'europeos', 'sets-regalo'])
         await expect(service.reorder(slugs)).rejects.toThrow(
             new BadRequestException(CATEGORY_ORDER_MISMATCH),
         )

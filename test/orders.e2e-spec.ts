@@ -44,7 +44,7 @@ describe('Orders (e2e)', () => {
         address: 'Av. Principal, casa 4',
         notes: '',
         deliveryMethod: 'delivery',
-        items: [{ productId: 'mug-001', variantId: 'v-15oz', quantity: 2 }],
+        items: [{ productId: 'perfume-001', variantId: 'v-15oz', quantity: 2 }],
         ...overrides,
     })
 
@@ -117,14 +117,14 @@ describe('Orders (e2e)', () => {
             variantLabel: '15 oz',
             unitPriceUsd: 16,
             quantity: 2,
-            imageUrl: 'http://img/taza.jpg',
+            imageUrl: 'http://img/lattafa-khamrah.jpg',
         })
         expect(order.status).toBe('PENDIENTE_PAGO')
         expect(order.pagoMovil).toEqual(PAGO_MOVIL)
         // Only the ordered variant loses units; the product total follows.
         expect(db.variantStock('v-15oz')).toBe(3)
         expect(db.variantStock('v-11oz')).toBe(3)
-        expect(db.stock('mug-001')).toBe(6)
+        expect(db.stock('perfume-001')).toBe(6)
         // Only the hash is stored.
         expect(db.table(OrderAccessLink)).toHaveLength(1)
         expect(db.table(OrderAccessLink)[0]).toMatchObject({
@@ -147,7 +147,12 @@ describe('Orders (e2e)', () => {
             .send(
                 checkout({
                     items: [
-                        { productId: 'mug-001', variantId: 'v-11oz', quantity: 1, unitPrice: 0.01 },
+                        {
+                            productId: 'perfume-001',
+                            variantId: 'v-11oz',
+                            quantity: 1,
+                            unitPrice: 0.01,
+                        },
                     ],
                 }),
             )
@@ -161,7 +166,7 @@ describe('Orders (e2e)', () => {
             .send(
                 checkout({
                     items: [
-                        { productId: 'tee-001', variantId: 'v-m', quantity: 2 },
+                        { productId: 'perfume-002', variantId: 'v-m', quantity: 2 },
                         { productId: 'off-001', quantity: 1 },
                     ],
                 }),
@@ -173,7 +178,7 @@ describe('Orders (e2e)', () => {
             { field: 'items.1', errors: ['«Oculto» ya no está disponible.'] },
         ])
         expect(stock.body.lines[0]).toMatchObject({ index: 0, available: 1 })
-        expect(db.stock('tee-001')).toBe(1)
+        expect(db.stock('perfume-002')).toBe(1)
         expect(db.table(Order)).toHaveLength(0)
     })
 
@@ -466,13 +471,15 @@ describe('Orders (e2e)', () => {
     })
 
     it('accepts a late payment without stock, flags the conflict and needs an acknowledgement', async () => {
-        const order = await createOrder([{ productId: 'tee-001', variantId: 'v-m', quantity: 1 }])
+        const order = await createOrder([
+            { productId: 'perfume-002', variantId: 'v-m', quantity: 1 },
+        ])
         await expire(order.code)
         // Sold elsewhere in the meantime.
         db.setVariantStock('v-m', 0)
 
         await payment(order.code, order.accessToken, { amountBs: '1' }).expect(200)
-        expect(db.stock('tee-001')).toBe(0)
+        expect(db.stock('perfume-002')).toBe(0)
         const detail = await request(app.getHttpServer())
             .get(`/api/admin/orders/${order.code}`)
             .set('Cookie', cookie('editor'))
@@ -482,7 +489,7 @@ describe('Orders (e2e)', () => {
             resolvedAt: null,
             lines: [
                 {
-                    productId: 'tee-001',
+                    productId: 'perfume-002',
                     variantId: 'v-m',
                     productName: 'Khamrah',
                     variantLabel: 'M',
@@ -512,15 +519,15 @@ describe('Orders (e2e)', () => {
         expect(confirmed.body.history.at(-1).note).toBe(
             'Pago confirmado con stock insuficiente: «Khamrah – M» faltan 1 unidad.',
         )
-        expect(db.stock('tee-001')).toBe(0)
+        expect(db.stock('perfume-002')).toBe(0)
 
         // Cancelling gives back only what the order really took (nothing here).
         await admin(order.code, '/transitions', 'admin', {
             to: 'CANCELADO',
-            note: 'Sin franelas',
+            note: 'Sin estuches',
             refundStatus: 'NO_APLICA',
         }).expect(200)
-        expect(db.stock('tee-001')).toBe(0)
+        expect(db.stock('perfume-002')).toBe(0)
     })
 
     it('lets staff record a payment sent by WhatsApp', async () => {
@@ -563,7 +570,9 @@ describe('Orders (e2e)', () => {
     })
 
     it('reactivates an expired order, refusing (or forcing) when stock is missing', async () => {
-        const order = await createOrder([{ productId: 'tee-001', variantId: 'v-m', quantity: 1 }])
+        const order = await createOrder([
+            { productId: 'perfume-002', variantId: 'v-m', quantity: 1 },
+        ])
         await expire(order.code)
         db.setVariantStock('v-m', 0)
 
@@ -587,7 +596,7 @@ describe('Orders (e2e)', () => {
         expect(forced.body.history.at(-1).note).toBe(
             'Pedido reactivado con un nuevo plazo de pago. Stock insuficiente: «Khamrah – M» pidió 1, hay 0.',
         )
-        expect(db.stock('tee-001')).toBe(0)
+        expect(db.stock('perfume-002')).toBe(0)
 
         const withStock = await createOrder()
         await expire(withStock.code)
@@ -599,7 +608,7 @@ describe('Orders (e2e)', () => {
     })
 
     describe('stock per variant', () => {
-        const MUG = 'Lattafa Khamrah'
+        const KHAMRAH = 'Lattafa Khamrah'
 
         it('adds up the lines of one variant and names it when it is short', async () => {
             const short = await request(app.getHttpServer())
@@ -607,16 +616,16 @@ describe('Orders (e2e)', () => {
                 .send(
                     checkout({
                         items: [
-                            { productId: 'mug-001', variantId: 'v-15oz', quantity: 3 },
-                            { productId: 'mug-001', variantId: 'v-11oz', quantity: 3 },
-                            { productId: 'mug-001', variantId: 'v-15oz', quantity: 3 },
+                            { productId: 'perfume-001', variantId: 'v-15oz', quantity: 3 },
+                            { productId: 'perfume-001', variantId: 'v-11oz', quantity: 3 },
+                            { productId: 'perfume-001', variantId: 'v-15oz', quantity: 3 },
                         ],
                     }),
                 )
                 .expect(400)
             // 5 units of 15 oz: the first line keeps 3, the third can keep 2; 11 oz is fine.
             expect(short.body.details).toEqual([
-                { field: 'items.2', errors: [`Solo quedan 5 unidades de «${MUG} – 15 oz».`] },
+                { field: 'items.2', errors: [`Solo quedan 5 unidades de «${KHAMRAH} – 15 oz».`] },
             ])
             expect(short.body.lines).toEqual([
                 expect.objectContaining({ index: 2, variantId: 'v-15oz', available: 2 }),
@@ -624,51 +633,51 @@ describe('Orders (e2e)', () => {
             expect(db.variantStock('v-15oz')).toBe(5)
 
             await createOrder([
-                { productId: 'mug-001', variantId: 'v-15oz', quantity: 2 },
-                { productId: 'mug-001', variantId: 'v-11oz', quantity: 1 },
-                { productId: 'mug-001', variantId: 'v-15oz', quantity: 2 },
+                { productId: 'perfume-001', variantId: 'v-15oz', quantity: 2 },
+                { productId: 'perfume-001', variantId: 'v-11oz', quantity: 1 },
+                { productId: 'perfume-001', variantId: 'v-15oz', quantity: 2 },
             ])
             expect(db.variantStock('v-15oz')).toBe(1)
             expect(db.variantStock('v-11oz')).toBe(2)
-            expect(db.stock('mug-001')).toBe(3)
+            expect(db.stock('perfume-001')).toBe(3)
         })
 
         it('refuses a sold-out variant while the other one still sells', async () => {
             db.setVariantStock('v-15oz', 0)
-            expect(db.stock('mug-001')).toBe(3)
+            expect(db.stock('perfume-001')).toBe(3)
 
             const soldOut = await request(app.getHttpServer())
                 .post('/api/orders')
                 .send(checkout())
                 .expect(400)
             expect(soldOut.body.details).toEqual([
-                { field: 'items.0', errors: [`«${MUG} – 15 oz» se agotó.`] },
+                { field: 'items.0', errors: [`«${KHAMRAH} – 15 oz» se agotó.`] },
             ])
             expect(soldOut.body.lines[0]).toMatchObject({ index: 0, available: 0 })
 
-            await createOrder([{ productId: 'mug-001', variantId: 'v-11oz', quantity: 3 }])
+            await createOrder([{ productId: 'perfume-001', variantId: 'v-11oz', quantity: 3 }])
             expect(db.variantStock('v-11oz')).toBe(0)
-            expect(db.stock('mug-001')).toBe(0)
+            expect(db.stock('perfume-001')).toBe(0)
         })
 
         it('gives each variant back its own units when the order expires', async () => {
             const order = await createOrder([
-                { productId: 'mug-001', variantId: 'v-11oz', quantity: 1 },
-                { productId: 'mug-001', variantId: 'v-15oz', quantity: 2 },
+                { productId: 'perfume-001', variantId: 'v-11oz', quantity: 1 },
+                { productId: 'perfume-001', variantId: 'v-15oz', quantity: 2 },
             ])
             expect([db.variantStock('v-11oz'), db.variantStock('v-15oz')]).toEqual([2, 3])
             await expire(order.code)
             expect([db.variantStock('v-11oz'), db.variantStock('v-15oz')]).toEqual([3, 5])
-            expect(db.stock('mug-001')).toBe(8)
+            expect(db.stock('perfume-001')).toBe(8)
         })
 
         it('keeps the stock of a product without variants on the product', async () => {
-            const order = await createOrder([{ productId: 'key-001', quantity: 2 }])
-            expect(db.stock('key-001')).toBe(1)
+            const order = await createOrder([{ productId: 'perfume-003', quantity: 2 }])
+            expect(db.stock('perfume-003')).toBe(1)
 
             const short = await request(app.getHttpServer())
                 .post('/api/orders')
-                .send(checkout({ items: [{ productId: 'key-001', quantity: 2 }] }))
+                .send(checkout({ items: [{ productId: 'perfume-003', quantity: 2 }] }))
                 .expect(400)
             expect(short.body.details).toEqual([
                 { field: 'items.0', errors: ['Solo queda 1 unidad de «Asad».'] },
@@ -678,13 +687,13 @@ describe('Orders (e2e)', () => {
                 to: 'CANCELADO',
                 note: 'Duplicado',
             }).expect(200)
-            expect(db.stock('key-001')).toBe(3)
+            expect(db.stock('perfume-003')).toBe(3)
         })
 
         it('restores nothing for a deleted variant and flags it when taken again', async () => {
             const order = await createOrder([
-                { productId: 'mug-001', variantId: 'v-15oz', quantity: 2 },
-                { productId: 'mug-001', variantId: 'v-11oz', quantity: 1 },
+                { productId: 'perfume-001', variantId: 'v-15oz', quantity: 2 },
+                { productId: 'perfume-001', variantId: 'v-11oz', quantity: 1 },
             ])
             // The owner removed the 15 oz version (its 3 remaining units go with it).
             const variants = db.table(ProductVariant)
@@ -704,7 +713,7 @@ describe('Orders (e2e)', () => {
                 to: 'PENDIENTE_PAGO',
             }).expect(409)
             expect(refused.body.message).toBe(
-                `No hay stock suficiente para reactivar el pedido: «${MUG} – 15 oz» pidió 2, hay 0.`,
+                `No hay stock suficiente para reactivar el pedido: «${KHAMRAH} – 15 oz» pidió 2, hay 0.`,
             )
 
             const forced = await admin(order.code, '/transitions', 'admin', {
@@ -713,9 +722,9 @@ describe('Orders (e2e)', () => {
             }).expect(200)
             expect(forced.body.stockConflict.lines).toEqual([
                 {
-                    productId: 'mug-001',
+                    productId: 'perfume-001',
                     variantId: 'v-15oz',
-                    productName: MUG,
+                    productName: KHAMRAH,
                     variantLabel: '15 oz',
                     requested: 2,
                     available: 0,
@@ -729,7 +738,7 @@ describe('Orders (e2e)', () => {
 
         it('takes a conflict line from its variant once the owner restocks it', async () => {
             const order = await createOrder([
-                { productId: 'tee-001', variantId: 'v-m', quantity: 1 },
+                { productId: 'perfume-002', variantId: 'v-m', quantity: 1 },
             ])
             await expire(order.code)
             db.setVariantStock('v-m', 0)
@@ -745,12 +754,12 @@ describe('Orders (e2e)', () => {
                 reserved: 1,
             })
             expect(db.variantStock('v-m')).toBe(3)
-            expect(db.stock('tee-001')).toBe(3)
+            expect(db.stock('perfume-002')).toBe(3)
 
             // Cancelling after the conflict gives back only what was taken.
             await admin(order.code, '/transitions', 'admin', {
                 to: 'CANCELADO',
-                note: 'Sin franelas',
+                note: 'Sin estuches',
                 refundStatus: 'NO_APLICA',
             }).expect(200)
             expect(db.variantStock('v-m')).toBe(4)
@@ -758,7 +767,7 @@ describe('Orders (e2e)', () => {
 
         it('confirms without acknowledgement once the owner restocked the variant', async () => {
             const order = await createOrder([
-                { productId: 'tee-001', variantId: 'v-m', quantity: 1 },
+                { productId: 'perfume-002', variantId: 'v-m', quantity: 1 },
             ])
             await expire(order.code)
             db.setVariantStock('v-m', 0)
@@ -792,13 +801,13 @@ describe('Orders (e2e)', () => {
                 'Pago confirmado; el stock que faltaba ya estaba disponible.',
             )
             expect(db.variantStock('v-m')).toBe(1)
-            expect(db.stock('tee-001')).toBe(1)
+            expect(db.stock('perfume-002')).toBe(1)
         })
 
         it('still needs the acknowledgement after a partial restock, with the current numbers', async () => {
             db.setVariantStock('v-m', 2)
             const order = await createOrder([
-                { productId: 'tee-001', variantId: 'v-m', quantity: 2 },
+                { productId: 'perfume-002', variantId: 'v-m', quantity: 2 },
             ])
             await expire(order.code)
             db.setVariantStock('v-m', 0)
@@ -840,15 +849,15 @@ describe('Orders (e2e)', () => {
 
         it('caps a legacy conflict line (no variantId) over all the variants of its product', async () => {
             const order = await createOrder([
-                { productId: 'mug-001', variantId: 'v-15oz', quantity: 2 },
-                { productId: 'mug-001', variantId: 'v-11oz', quantity: 1 },
+                { productId: 'perfume-001', variantId: 'v-15oz', quantity: 2 },
+                { productId: 'perfume-001', variantId: 'v-11oz', quantity: 1 },
             ])
             orderRow(order.code).stockConflict = {
                 detectedAt: new Date().toISOString(),
                 lines: [
                     {
-                        productId: 'mug-001',
-                        productName: MUG,
+                        productId: 'perfume-001',
+                        productName: KHAMRAH,
                         requested: 3,
                         available: 1,
                         reserved: 1,
@@ -906,7 +915,7 @@ describe('Orders (e2e)', () => {
                 checkout({
                     items: [
                         {
-                            productId: 'mug-001',
+                            productId: 'perfume-001',
                             variantId: 'v-11oz',
                             quantity: 1,
                             personalization: 'Ana',
@@ -1066,7 +1075,7 @@ describe('Orders (e2e)', () => {
                 .post('/api/orders')
                 .send(
                     checkout({
-                        items: [{ productId: 'mug-001', variantId: 'v-11oz', quantity: 1 }],
+                        items: [{ productId: 'perfume-001', variantId: 'v-11oz', quantity: 1 }],
                     }),
                 )
                 .expect(201)
@@ -1206,7 +1215,7 @@ describe('Orders (e2e)', () => {
             expect(a.body.code).toBe(b.body.code)
             expect(db.table(Order)).toHaveLength(1)
             expect(db.variantStock('v-15oz')).toBe(3)
-            expect(db.stock('mug-001')).toBe(6)
+            expect(db.stock('perfume-001')).toBe(6)
         })
 
         it('replays when the unique index catches a retry that missed the lookup', async () => {

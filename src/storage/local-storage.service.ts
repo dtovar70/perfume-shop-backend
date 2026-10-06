@@ -4,14 +4,18 @@ import { mkdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Logger } from '@nestjs/common'
 import { IMAGE_EXTENSIONS } from './image-type.js'
+import { MEDIA_EXTENSIONS, mediaKindOfExtension } from './media-type.js'
 import type {
+    MediaFolder,
     PrivateFileAccess,
     PrivateFolder,
     PublicFolder,
     StorageService,
     StoredFile,
+    StoredMediaRef,
     StoredPrivateFile,
     UploadableImage,
+    UploadableMedia,
 } from './storage.service.js'
 
 /** Root folder for local uploads, served statically at `/uploads` (see main.ts). */
@@ -24,6 +28,8 @@ export const LOCAL_UPLOADS_DIR = join(process.cwd(), 'uploads')
 export const LOCAL_PRIVATE_UPLOADS_DIR = join(process.cwd(), 'private-uploads')
 
 const SAFE_PUBLIC_ID = /^(products|brands)\/[a-f0-9-]{36}\.(jpg|png|webp)$/
+/** Keys of page media this service creates (`hero/<uuid>.<ext>`). */
+const SAFE_MEDIA_ID = /^(hero)\/[a-f0-9-]{36}\.(jpg|png|webp|avif|mp4|webm)$/
 /** Keys this service creates for private files; anything else is refused (path traversal). */
 const SAFE_PRIVATE_KEY = /^(payment-proofs)\/[a-f0-9-]{36}\.(jpg|png|webp)$/
 
@@ -66,6 +72,40 @@ export class LocalStorageService implements StorageService {
         }
         try {
             await unlink(join(LOCAL_UPLOADS_DIR, publicId))
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+        }
+    }
+
+    async uploadMedia(media: UploadableMedia, folder: MediaFolder): Promise<StoredFile> {
+        const directory = join(LOCAL_UPLOADS_DIR, folder)
+        await mkdir(directory, { recursive: true })
+
+        const fileName = `${randomUUID()}.${MEDIA_EXTENSIONS[media.type]}`
+        await writeFile(join(directory, fileName), media.buffer)
+
+        const publicId = `${folder}/${fileName}`
+        return { url: `${this.publicApiUrl}/uploads/${publicId}`, publicId }
+    }
+
+    mediaFromUrl(url: string, folder: MediaFolder): StoredMediaRef | null {
+        const prefix = `${this.publicApiUrl}/uploads/`
+        if (!url.startsWith(prefix)) return null
+        const publicId = url.slice(prefix.length)
+        if (!SAFE_MEDIA_ID.test(publicId) || !publicId.startsWith(`${folder}/`)) return null
+        return {
+            publicId,
+            kind: mediaKindOfExtension(publicId.slice(publicId.lastIndexOf('.') + 1)),
+        }
+    }
+
+    async deleteMedia(media: StoredMediaRef): Promise<void> {
+        if (!SAFE_MEDIA_ID.test(media.publicId)) {
+            this.logger.warn(`Refusing to delete unexpected local media key "${media.publicId}"`)
+            return
+        }
+        try {
+            await unlink(join(LOCAL_UPLOADS_DIR, media.publicId))
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
         }

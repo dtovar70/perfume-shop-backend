@@ -27,13 +27,14 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
         ],
     },
     home: {
-        heroBadge: 'Perfumería de autor',
+        heroBadge: '',
         heroTitle: 'Fragancias que *cuentan* quién eres',
         heroSubtitle:
             'Una selección cuidada de perfumes árabes, de nicho y de diseñador. Encuentra tu firma olfativa y llévala contigo.',
         heroPrimaryCta: 'Explorar catálogo',
         heroSecondaryCta: 'Ver los más vendidos',
         heroFeatures: ['100% originales', 'Envío nacional', 'Asesoría olfativa'],
+        heroMedia: null,
         categoriesEyebrow: 'Colecciones',
         categoriesTitle: 'Encuentra tu *esencia*',
         categoriesDescription:
@@ -122,7 +123,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
         email: 'hola@kaizen.com',
         phone: '0414-5086536',
         whatsapp: '0414-5086536',
-        city: 'Quíbor, estado Lara',
+        city: 'Caracas',
         schedule: 'Lunes a sábado, 9:00 a.m. – 7:00 p.m.',
         instagram: 'kaizen.perfumeria',
         tiktok: 'kaizen.perfumeria',

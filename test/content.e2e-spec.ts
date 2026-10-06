@@ -10,6 +10,7 @@ import { User } from '../src/auth/entities/user.entity.js'
 import { Role } from '../src/auth/role.enum.js'
 import { createValidationPipe } from '../src/common/pipes/validation.pipe.js'
 import { DEFAULT_SITE_CONTENT } from '../src/content/content.defaults.js'
+import { STORAGE_SERVICE, type StorageService } from '../src/storage/storage.service.js'
 import { catalogRepository } from './fixtures/catalogs.js'
 
 const USERS = {
@@ -40,6 +41,32 @@ const contentRepository = {
     delete: vi.fn().mockResolvedValue({ affected: 0 }),
 }
 
+/** Uploads never reach the disk or Cloudinary. */
+const storage = {
+    driver: 'local' as const,
+    uploadMedia: vi.fn((media: { type: string }) =>
+        Promise.resolve({
+            url: `http://localhost:3000/uploads/hero/test.${media.type}`,
+            publicId: `hero/test.${media.type}`,
+        }),
+    ),
+    mediaFromUrl: vi.fn().mockReturnValue(null),
+    deleteMedia: vi.fn().mockResolvedValue(undefined),
+}
+
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
+const MP4 = Buffer.concat([
+    Buffer.from([0, 0, 0, 0x18]),
+    Buffer.from('ftypisom\0\0\x02\0isomiso2', 'binary'),
+    Buffer.alloc(64),
+])
+const MB = 1024 * 1024
+
+/** `size` bytes that start with `head`. */
+function padded(head: Buffer, size: number): Buffer {
+    return Buffer.concat([head, Buffer.alloc(size - head.length)])
+}
+
 const dataSourceStub = {
     isInitialized: false,
     entityMetadatas: [],
@@ -63,6 +90,8 @@ describe('Site content (e2e)', () => {
         const moduleFixture = await Test.createTestingModule({ imports: [AppModule] })
             .overrideProvider(getDataSourceToken())
             .useValue(dataSourceStub)
+            .overrideProvider(STORAGE_SERVICE)
+            .useValue(storage as unknown as StorageService)
             .compile()
 
         app = moduleFixture.createNestApplication()
@@ -175,5 +204,87 @@ describe('Site content (e2e)', () => {
             .expect(200)
         expect(contentRepository.delete).toHaveBeenCalledWith({ key: 'home' })
         expect(response.body.value).toEqual(DEFAULT_SITE_CONTENT.home)
+    })
+
+    describe('POST /api/admin/content/hero-media', () => {
+        const upload = (user?: keyof typeof USERS) => {
+            const req = request(app.getHttpServer()).post('/api/admin/content/hero-media')
+            return user ? req.set('Cookie', cookie(user)) : req
+        }
+
+        it('requires a staff session', async () => {
+            await upload()
+                .attach('file', MP4, { filename: 'clip.mp4', contentType: 'video/mp4' })
+                .expect(401)
+            expect(storage.uploadMedia).not.toHaveBeenCalled()
+        })
+
+        it('stores a video and its poster and returns their URLs', async () => {
+            const response = await upload('editor')
+                .attach('file', MP4, { filename: 'clip.mp4', contentType: 'video/mp4' })
+                .attach('poster', PNG, { filename: 'still.png', contentType: 'image/png' })
+                .expect(201)
+            expect(response.body).toEqual({
+                url: 'http://localhost:3000/uploads/hero/test.mp4',
+                publicId: 'hero/test.mp4',
+                type: 'video',
+                posterUrl: 'http://localhost:3000/uploads/hero/test.png',
+            })
+        })
+
+        it('rejects other file types, by mimetype and by real content', async () => {
+            const svg = await upload('admin')
+                .attach('file', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), {
+                    filename: 'logo.svg',
+                    contentType: 'image/svg+xml',
+                })
+                .expect(400)
+            expect(svg.body.message).toBe(
+                'La portada debe ser una imagen JPG, PNG, WEBP o AVIF, o un video MP4 o WEBM.',
+            )
+
+            const disguised = await upload('admin')
+                .attach('file', Buffer.from('GIF89a-not-a-video'), {
+                    filename: 'clip.mp4',
+                    contentType: 'video/mp4',
+                })
+                .expect(400)
+            expect(disguised.body.message).toBe(svg.body.message)
+
+            const videoPoster = await upload('admin')
+                .attach('file', PNG, { filename: 'a.png', contentType: 'image/png' })
+                .attach('poster', MP4, { filename: 'b.mp4', contentType: 'video/mp4' })
+                .expect(400)
+            expect(videoPoster.body.message).toBe(
+                'La imagen previa debe ser una imagen JPG, PNG, WEBP o AVIF.',
+            )
+            expect(storage.uploadMedia).not.toHaveBeenCalled()
+        })
+
+        it('rejects videos over 8 MB and images over 5 MB', async () => {
+            const video = await upload('admin')
+                .attach('file', padded(MP4, 8 * MB + 1), {
+                    filename: 'clip.mp4',
+                    contentType: 'video/mp4',
+                })
+                .expect(413)
+            expect(video.body.message).toBe(
+                'El archivo pesa demasiado: los videos pueden pesar hasta 8 MB y las imágenes hasta 5 MB.',
+            )
+
+            const image = await upload('admin')
+                .attach('file', padded(PNG, 5 * MB + 1), {
+                    filename: 'big.png',
+                    contentType: 'image/png',
+                })
+                .expect(413)
+            expect(image.body.message).toBe('Las imágenes pueden pesar como máximo 5 MB.')
+            expect(storage.uploadMedia).not.toHaveBeenCalled()
+        })
+
+        it('requires the file', async () => {
+            const response = await upload('admin').field('alt', 'x').expect(400)
+            expect(response.body.message).toBe('Adjunta la imagen o el video en el campo "file".')
+        })
     })
 })

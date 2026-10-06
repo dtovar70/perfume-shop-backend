@@ -8,7 +8,11 @@ import {
     Param,
     Post,
     Put,
+    UploadedFiles,
+    UseFilters,
+    UseInterceptors,
 } from '@nestjs/common'
+import { FileFieldsInterceptor } from '@nestjs/platform-express'
 import { Role } from '../auth/role.enum.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import { Public } from '../common/decorators/public.decorator.js'
@@ -18,8 +22,14 @@ import {
     ContentService,
     type AdminContentDto,
     type AdminContentSectionDto,
+    type HeroMediaUploadDto,
 } from './content.service.js'
 import type { SiteContent } from './content.types.js'
+import {
+    HERO_MEDIA_FIELDS,
+    HERO_MEDIA_UPLOAD_OPTIONS,
+    HeroMediaUploadErrorsFilter,
+} from './hero-media-upload.js'
 
 /**
  * Public site content. `no-cache` lets browsers keep a copy but revalidate it on every load;
@@ -46,6 +56,21 @@ export class AdminContentController {
     @Header('Cache-Control', 'no-store')
     getAll(): Promise<AdminContentDto> {
         return this.content.getAllForAdmin()
+    }
+
+    /**
+     * Uploads the home hero's image or video (`file`, plus an optional `poster` image) and
+     * returns its URL. Saving the home section with that URL publishes it and deletes the
+     * previous upload. Declared before `:section` routes for readability; paths do not overlap.
+     */
+    @Post('hero-media')
+    @UseFilters(HeroMediaUploadErrorsFilter)
+    @UseInterceptors(FileFieldsInterceptor(HERO_MEDIA_FIELDS, HERO_MEDIA_UPLOAD_OPTIONS))
+    uploadHeroMedia(
+        @UploadedFiles()
+        files: { file?: Express.Multer.File[]; poster?: Express.Multer.File[] } | undefined,
+    ): Promise<HeroMediaUploadDto> {
+        return this.content.uploadHeroMedia(files?.file?.[0], files?.poster?.[0])
     }
 
     /**

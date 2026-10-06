@@ -1,5 +1,6 @@
 import type { Readable } from 'node:stream'
 import type { ImageType } from './image-type.js'
+import type { MediaKind, MediaType } from './media-type.js'
 
 export const STORAGE_SERVICE = Symbol('STORAGE_SERVICE')
 
@@ -18,6 +19,21 @@ export interface StoredFile {
 /** Folders of the public area: product photos and brand logos. */
 export const PUBLIC_FOLDERS = ['products', 'brands'] as const
 export type PublicFolder = (typeof PUBLIC_FOLDERS)[number]
+
+/** Folders of public page media (images or videos), e.g. the home hero. */
+export const MEDIA_FOLDERS = ['hero'] as const
+export type MediaFolder = (typeof MEDIA_FOLDERS)[number]
+
+export interface UploadableMedia {
+    buffer: Buffer
+    type: MediaType
+}
+
+/** A media file this service stored, recognized from its public URL. */
+export interface StoredMediaRef {
+    publicId: string
+    kind: MediaKind
+}
 
 /** Folders of the private area. Each one is a fixed, known prefix of the stored keys. */
 export const PRIVATE_FOLDERS = ['payment-proofs'] as const
@@ -42,6 +58,15 @@ export interface StorageService {
     /** Public image, in `folder` (default `products`). */
     upload(image: UploadableImage, folder?: PublicFolder): Promise<StoredFile>
     delete(publicId: string): Promise<void>
+
+    /** Public image or video for page content, in `folder`. */
+    uploadMedia(media: UploadableMedia, folder: MediaFolder): Promise<StoredFile>
+    /**
+     * The stored media file behind a public URL, only when this service created it in `folder`;
+     * null for any other URL. Used to accept our own URLs and to delete replaced files.
+     */
+    mediaFromUrl(url: string, folder: MediaFolder): StoredMediaRef | null
+    deleteMedia(media: StoredMediaRef): Promise<void>
 
     /**
      * Private files (e.g. payment screenshots with bank data). They are never publicly

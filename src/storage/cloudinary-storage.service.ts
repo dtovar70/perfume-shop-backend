@@ -1,12 +1,16 @@
 import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary'
+import { mediaKind } from './media-type.js'
 import type {
+    MediaFolder,
     PrivateFileAccess,
     PrivateFolder,
     PublicFolder,
     StorageService,
     StoredFile,
+    StoredMediaRef,
     StoredPrivateFile,
     UploadableImage,
+    UploadableMedia,
 } from './storage.service.js'
 
 export interface CloudinaryCredentials {
@@ -47,10 +51,19 @@ function splitKey(key: string): { publicId: string; format: string } {
     return { publicId: key.slice(0, dot), format: key.slice(dot + 1) }
 }
 
+function escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 export class CloudinaryStorageService implements StorageService {
     readonly driver = 'cloudinary' as const
+    /** `https://res.cloudinary.com/<cloud>/<image|video>/upload/v123/kaizen/<folder>/<id>.<ext>` */
+    private readonly mediaUrl: RegExp
 
     constructor(credentials: CloudinaryCredentials) {
+        this.mediaUrl = new RegExp(
+            `^https://res\\.cloudinary\\.com/${escapeRegExp(credentials.cloudName)}/(image|video)/upload/(?:v\\d+/)?(${PUBLIC_ROOT}/([a-z-]+)/[A-Za-z0-9_-]+)\\.[a-z0-9]+$`,
+        )
         cloudinary.config({
             cloud_name: credentials.cloudName,
             api_key: credentials.apiKey,
@@ -73,6 +86,28 @@ export class CloudinaryStorageService implements StorageService {
 
     async delete(publicId: string): Promise<void> {
         await cloudinary.uploader.destroy(publicId, { resource_type: 'image', invalidate: true })
+    }
+
+    /** Videos are a separate Cloudinary resource type (`video`), with their own delivery URLs. */
+    async uploadMedia(media: UploadableMedia, folder: MediaFolder): Promise<StoredFile> {
+        const result = await uploadBuffer(media.buffer, {
+            folder: `${PUBLIC_ROOT}/${folder}`,
+            resource_type: mediaKind(media.type),
+        })
+        return { url: result.secure_url, publicId: result.public_id }
+    }
+
+    mediaFromUrl(url: string, folder: MediaFolder): StoredMediaRef | null {
+        const match = this.mediaUrl.exec(url)
+        if (!match || match[3] !== folder) return null
+        return { publicId: match[2] ?? '', kind: match[1] === 'video' ? 'video' : 'image' }
+    }
+
+    async deleteMedia(media: StoredMediaRef): Promise<void> {
+        await cloudinary.uploader.destroy(media.publicId, {
+            resource_type: media.kind,
+            invalidate: true,
+        })
     }
 
     /**

@@ -67,7 +67,7 @@ describe('AdminProductsService stock', () => {
         const { service, manager } = setup()
         await service.create({
             name: 'Yara',
-            categorySlug: 'mujer',
+            categorySlug: 'europeos',
             price: 20,
             description: '',
             stock: 99,
@@ -92,7 +92,7 @@ describe('AdminProductsService stock', () => {
         const { service, manager } = setup()
         await service.create({
             name: 'Asad',
-            categorySlug: 'keychains',
+            categorySlug: 'arabes',
             price: 4,
             description: '',
             stock: 7,

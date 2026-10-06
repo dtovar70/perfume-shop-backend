@@ -282,7 +282,7 @@ describe('Admin users and own account (e2e)', () => {
         await http()
             .patch(`/api/admin/users/${OWNER.id}`)
             .set('Cookie', owner)
-            .send({ name: 'Dueña Russo', role: Role.ADMIN })
+            .send({ name: 'Dueña KaiZen', role: Role.ADMIN })
             .expect(200)
 
         const deactivate = await http()

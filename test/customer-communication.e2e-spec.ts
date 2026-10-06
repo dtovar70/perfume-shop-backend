@@ -45,7 +45,7 @@ describe('Customer communication: access links, WhatsApp messages and receipts (
         address: 'Av. Principal, casa 4',
         notes: '',
         deliveryMethod: 'delivery',
-        items: [{ productId: 'mug-001', variantId: 'v-15oz', quantity: 2 }],
+        items: [{ productId: 'perfume-001', variantId: 'v-15oz', quantity: 2 }],
         ...overrides,
     })
 

@@ -64,7 +64,7 @@ describe('Customer emails: "Pedido recibido" and "Consultar mi pedido" (e2e)', (
                     deliveryMethod: 'delivery',
                     items: [
                         {
-                            productId: 'mug-001',
+                            productId: 'perfume-001',
                             variantId: 'v-15oz',
                             quantity: 2,
                         },

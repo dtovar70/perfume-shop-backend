@@ -19,30 +19,6 @@ export const categories: SeedCategory[] = [
         colorHex: '#B76E79',
     },
     {
-        slug: 'mujer',
-        name: 'Mujer',
-        tagline: 'Femeninas, magnéticas, inolvidables',
-        description:
-            'Florales luminosos, gourmands seductores y frutales llenos de vida. Fragancias que acompañan cada faceta de tu día.',
-        colorHex: '#E8B4B8',
-    },
-    {
-        slug: 'hombre',
-        name: 'Hombre',
-        tagline: 'Presencia que se recuerda',
-        description:
-            'Aromáticos frescos, amaderados profundos y especiados con carácter. Para el que deja huella sin decir una palabra.',
-        colorHex: '#8C6A4F',
-    },
-    {
-        slug: 'unisex',
-        name: 'Unisex',
-        tagline: 'Sin reglas, solo esencia',
-        description:
-            'Fragancias que no entienden de etiquetas: ámbar, maderas y resinas pensadas para quien elige por instinto.',
-        colorHex: '#D4AF7A',
-    },
-    {
         slug: 'sets-regalo',
         name: 'Sets y regalos',
         tagline: 'El detalle perfecto, listo para regalar',

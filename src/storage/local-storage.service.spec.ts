@@ -47,3 +47,24 @@ describe('LocalStorageService private files', () => {
         await expect(storage.deletePrivate('../../package.json')).resolves.toBeUndefined()
     })
 })
+
+describe('LocalStorageService media URLs', () => {
+    const storage = new LocalStorageService('http://localhost:3000')
+    const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
+
+    it('recognizes only its own hero uploads, with their kind', () => {
+        expect(
+            storage.mediaFromUrl(`http://localhost:3000/uploads/hero/${id}.mp4`, 'hero'),
+        ).toEqual({ publicId: `hero/${id}.mp4`, kind: 'video' })
+        expect(
+            storage.mediaFromUrl(`http://localhost:3000/uploads/hero/${id}.avif`, 'hero'),
+        ).toEqual({ publicId: `hero/${id}.avif`, kind: 'image' })
+        expect(
+            storage.mediaFromUrl(`http://localhost:3000/uploads/products/${id}.jpg`, 'hero'),
+        ).toBeNull()
+        expect(
+            storage.mediaFromUrl(`http://localhost:3000/uploads/hero/../../.env`, 'hero'),
+        ).toBeNull()
+        expect(storage.mediaFromUrl(`https://cdn.example.com/hero/${id}.mp4`, 'hero')).toBeNull()
+    })
+})

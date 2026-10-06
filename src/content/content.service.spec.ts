@@ -7,6 +7,7 @@ import {
     type MobilePrefixesService,
 } from '../catalogs/mobile-prefixes.service.js'
 import type { AuthUser } from '../common/types/auth-user.js'
+import type { StorageService } from '../storage/storage.service.js'
 import { DEFAULT_SITE_CONTENT } from './content.defaults.js'
 import { ContentService, mergeSection } from './content.service.js'
 import { CONTENT_SECTIONS } from './content.types.js'
@@ -19,6 +20,19 @@ const USER: AuthUser = {
     role: Role.ADMIN,
     createdAt: new Date(),
     updatedAt: new Date(),
+}
+
+const STORAGE_URL = 'http://api.test/uploads'
+
+/** Smallest signatures `detectMediaType` recognizes. */
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
+const MP4_BYTES = Buffer.concat([
+    Buffer.from([0, 0, 0, 0x18]),
+    Buffer.from('ftypisom\0\0\x02\0isomiso2', 'binary'),
+])
+
+function multerFile(buffer: Buffer, size = buffer.length): Express.Multer.File {
+    return { buffer, size, originalname: 'file', mimetype: 'application/octet-stream' } as never
 }
 
 function setup(rows: Partial<SiteContentEntry>[] = []) {
@@ -49,12 +63,27 @@ function setup(rows: Partial<SiteContentEntry>[] = []) {
             ),
         ),
     }
+    /** Local-like storage: our hero uploads live under `${STORAGE_URL}/hero/`. */
+    const storage = {
+        uploadMedia: vi.fn((media: { type: string }) => {
+            const extension = media.type === 'jpeg' ? 'jpg' : media.type
+            const publicId = `hero/file-${storage.uploadMedia.mock.calls.length}.${extension}`
+            return Promise.resolve({ url: `${STORAGE_URL}/${publicId}`, publicId })
+        }),
+        mediaFromUrl: vi.fn((url: string) => {
+            if (!url.startsWith(`${STORAGE_URL}/hero/`)) return null
+            const publicId = url.slice(STORAGE_URL.length + 1)
+            return { publicId, kind: /\.(mp4|webm)$/.test(publicId) ? 'video' : 'image' }
+        }),
+        deleteMedia: vi.fn().mockResolvedValue(undefined),
+    }
     const service = new ContentService(
         entries as unknown as Repository<SiteContentEntry>,
         banks as unknown as BanksService,
         mobilePrefixes as unknown as MobilePrefixesService,
+        storage as unknown as StorageService,
     )
-    return { service, entries, banks, mobilePrefixes }
+    return { service, entries, banks, mobilePrefixes, storage }
 }
 
 /** The validation error details of a rejected update. */
@@ -483,6 +512,165 @@ describe('ContentService', () => {
             isDefault: true,
             updatedAt: null,
             updatedBy: null,
+        })
+    })
+
+    describe('hero media', () => {
+        const video = {
+            type: 'video',
+            url: `${STORAGE_URL}/hero/clip.mp4`,
+            posterUrl: `${STORAGE_URL}/hero/still.jpg`,
+            alt: '  Botella sobre la arena  ',
+        }
+
+        it('ships none, and stores an uploaded video with its poster and a trimmed alt', async () => {
+            expect(DEFAULT_SITE_CONTENT.home.heroMedia).toBeNull()
+            const { service, entries } = setup()
+            await service.update('home', { ...DEFAULT_SITE_CONTENT.home, heroMedia: video }, USER)
+            const [, params] = entries.query.mock.calls[0] as [string, unknown[]]
+            expect(JSON.parse(params[1] as string).heroMedia).toEqual({
+                ...video,
+                alt: 'Botella sobre la arena',
+            })
+        })
+
+        it('treats a missing hero media as none and drops the poster of an image', async () => {
+            const { service, entries } = setup()
+            const { heroMedia: _omitted, ...home } = DEFAULT_SITE_CONTENT.home
+            await service.update('home', home, USER)
+            await service.update(
+                'home',
+                {
+                    ...home,
+                    heroMedia: { ...video, type: 'image', url: 'https://cdn.example.com/a.jpg' },
+                },
+                USER,
+            )
+            const stored = entries.query.mock.calls.map(
+                ([, params]) => JSON.parse((params as unknown[])[1] as string).heroMedia,
+            )
+            expect(stored[0]).toBeNull()
+            expect(stored[1]).toEqual({
+                type: 'image',
+                url: 'https://cdn.example.com/a.jpg',
+                posterUrl: null,
+                alt: 'Botella sobre la arena',
+            })
+        })
+
+        it('accepts only our uploads of the right kind or https URLs', async () => {
+            const { service, entries } = setup()
+            const save = (heroMedia: unknown) =>
+                detailsOf(service.update('home', { ...DEFAULT_SITE_CONTENT.home, heroMedia }, USER))
+
+            expect(
+                await save({ ...video, url: 'http://evil.test/a.mp4', posterUrl: 'javascript:x' }),
+            ).toEqual([
+                {
+                    field: 'heroMedia.url',
+                    errors: [
+                        'El archivo de la portada debe ser un archivo subido o un enlace https://.',
+                    ],
+                },
+                {
+                    field: 'heroMedia.posterUrl',
+                    errors: [
+                        'La imagen previa del video debe ser un archivo subido o un enlace https://.',
+                    ],
+                },
+            ])
+            expect(await save({ ...video, posterUrl: `${STORAGE_URL}/hero/other.webm` })).toEqual([
+                {
+                    field: 'heroMedia.posterUrl',
+                    errors: ['La imagen previa del video debe ser una imagen.'],
+                },
+            ])
+            expect(
+                (await save({ ...video, type: 'gif', url: '' })).map((detail) => detail.field),
+            ).toEqual(['heroMedia.type', 'heroMedia.url'])
+            expect((await save('video.mp4')).map((detail) => detail.field)).toEqual(['heroMedia'])
+            expect(entries.query).not.toHaveBeenCalled()
+        })
+
+        it('deletes the files of a replaced or removed hero media, never foreign URLs', async () => {
+            const { service, entries, storage } = setup()
+            entries.findOne.mockResolvedValueOnce({
+                key: 'home',
+                value: { ...DEFAULT_SITE_CONTENT.home, heroMedia: video },
+            })
+            await service.update(
+                'home',
+                {
+                    ...DEFAULT_SITE_CONTENT.home,
+                    heroMedia: { ...video, url: `${STORAGE_URL}/hero/new.webm` },
+                },
+                USER,
+            )
+            // The poster is kept, so only the old video goes.
+            expect(storage.deleteMedia).toHaveBeenCalledTimes(1)
+            expect(storage.deleteMedia).toHaveBeenCalledWith({
+                publicId: 'hero/clip.mp4',
+                kind: 'video',
+            })
+
+            storage.deleteMedia.mockClear()
+            entries.findOne.mockResolvedValueOnce({
+                key: 'home',
+                value: {
+                    heroMedia: { ...video, posterUrl: 'https://cdn.example.com/poster.jpg' },
+                },
+            })
+            await service.reset('home')
+            expect(storage.deleteMedia).toHaveBeenCalledTimes(1)
+            expect(storage.deleteMedia).toHaveBeenCalledWith({
+                publicId: 'hero/clip.mp4',
+                kind: 'video',
+            })
+        })
+
+        it('falls back to none for a malformed stored hero media', () => {
+            expect(
+                mergeSection('home', { heroMedia: { type: 'gif', url: 'x' } }).heroMedia,
+            ).toBeNull()
+            expect(
+                mergeSection('home', { heroMedia: { type: 'image', url: 'https://a.test/x.jpg' } })
+                    .heroMedia,
+            ).toEqual({ type: 'image', url: 'https://a.test/x.jpg', posterUrl: null, alt: '' })
+        })
+
+        it('uploads a checked video and poster and returns their URLs', async () => {
+            const { service, storage } = setup()
+            const result = await service.uploadHeroMedia(
+                multerFile(MP4_BYTES),
+                multerFile(PNG_BYTES),
+            )
+            expect(storage.uploadMedia.mock.calls.map(([media]) => media.type)).toEqual([
+                'mp4',
+                'png',
+            ])
+            expect(result).toEqual({
+                url: `${STORAGE_URL}/hero/file-1.mp4`,
+                publicId: 'hero/file-1.mp4',
+                type: 'video',
+                posterUrl: `${STORAGE_URL}/hero/file-2.png`,
+            })
+        })
+
+        it('rejects missing, disguised or oversized files before storing anything', async () => {
+            const { service, storage } = setup()
+            await expect(service.uploadHeroMedia(undefined, undefined)).rejects.toThrow(
+                BadRequestException,
+            )
+            await expect(
+                service.uploadHeroMedia(multerFile(Buffer.from('<svg/>')), undefined),
+            ).rejects.toThrow('La portada debe ser una imagen JPG, PNG, WEBP o AVIF')
+            await expect(
+                service.uploadHeroMedia(multerFile(PNG_BYTES), multerFile(MP4_BYTES)),
+            ).rejects.toThrow('La imagen previa debe ser una imagen')
+            await expect(
+                service.uploadHeroMedia(multerFile(PNG_BYTES, 6 * 1024 * 1024), undefined),
+            ).rejects.toThrow('Las imágenes pueden pesar como máximo 5 MB.')
+            expect(storage.uploadMedia).not.toHaveBeenCalled()
         })
     })
 })

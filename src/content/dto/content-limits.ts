@@ -32,6 +32,8 @@ export const CONTENT_LIMITS = {
     testimonialQuote: 400,
     testimonialName: 60,
     testimonialProduct: 80,
+    mediaAlt: 140,
+    mediaUrl: 500,
 } as const
 
 export const CONTENT_LIST_SIZES = {

@@ -5,7 +5,7 @@ import type { MigrationInterface, QueryRunner } from 'typeorm'
  * that the customer's design editor uses instead of the generated illustration.
  *
  * - `design_template_image_url` / `design_template_public_id`: the public stored image
- *   (Cloudinary folder `manada-russo/design-templates/`), with its pixel size in
+ *   (a `design-templates/` Cloudinary folder of the previous store), with its pixel size in
  *   `design_template_width` / `design_template_height`. All four are set together or none.
  * - `design_print_area` (jsonb `{ x, y, width, height }`, 0..1 relative to the photo): where the
  *   print goes on the photo. Only kept while there is a photo (validated by the API).

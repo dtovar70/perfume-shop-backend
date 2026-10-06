@@ -24,7 +24,7 @@ describe('Contact form without Telegram (e2e)', () => {
         fullName: 'Ana Pérez',
         email: 'ana@example.com',
         topic: 'asesoria',
-        message: 'Quiero 20 tazas con el logo de mi empresa.',
+        message: 'Quiero 20 perfumes para regalar en mi empresa.',
         ...overrides,
     })
     const send = (body: unknown) =>

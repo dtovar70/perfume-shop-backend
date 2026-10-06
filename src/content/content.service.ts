@@ -1,7 +1,10 @@
 import {
     BadRequestException,
+    Inject,
     Injectable,
+    Logger,
     NotFoundException,
+    PayloadTooLargeException,
     type ValidationPipe,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -10,16 +13,32 @@ import { BanksService } from '../catalogs/banks.service.js'
 import { MobilePrefixesService } from '../catalogs/mobile-prefixes.service.js'
 import { createValidationPipe } from '../common/pipes/validation.pipe.js'
 import type { AuthUser } from '../common/types/auth-user.js'
+import { detectMediaType, mediaKind, type MediaType } from '../storage/media-type.js'
+import {
+    STORAGE_SERVICE,
+    type StorageService,
+    type StoredMediaRef,
+} from '../storage/storage.service.js'
 import { DEFAULT_SITE_CONTENT } from './content.defaults.js'
 import {
     CONTENT_SECTIONS,
+    HERO_MEDIA_TYPES,
     isContentSection,
     type ContactContent,
     type ContentSection,
+    type HeroMedia,
+    type HomeContent,
     type PaymentContent,
     type SiteContent,
 } from './content.types.js'
 import { CONTENT_SECTION_DTOS } from './dto/index.js'
+import {
+    HERO_IMAGE_TOO_LARGE,
+    HERO_MEDIA_FIELD,
+    INVALID_HERO_MEDIA_TYPE,
+    INVALID_HERO_POSTER_TYPE,
+    MAX_HERO_IMAGE_BYTES,
+} from './hero-media-upload.js'
 import { SiteContentEntry } from './entities/site-content.entity.js'
 
 export function unknownSectionMessage(section: string): string {
@@ -37,6 +56,16 @@ export interface AdminContentSectionDto<K extends ContentSection = ContentSectio
     updatedBy: { id: string; name: string } | null
 }
 
+/** An uploaded hero file. Saving the home section with its URL is what publishes it. */
+export interface HeroMediaUploadDto {
+    url: string
+    /** Storage key of the file. */
+    publicId: string
+    type: HeroMedia['type']
+    /** The uploaded `poster` image, if one was sent. */
+    posterUrl: string | null
+}
+
 export type AdminContentDto = { [K in ContentSection]: AdminContentSectionDto<K> }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -46,6 +75,26 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function sameKind(stored: unknown, fallback: unknown): boolean {
     if (Array.isArray(fallback)) return Array.isArray(stored)
     return typeof stored === typeof fallback && stored !== null
+}
+
+/** A stored hero media with the expected shape, or null (older or hand-edited rows). */
+export function sanitizeHeroMedia(value: unknown): HeroMedia | null {
+    if (!isPlainObject(value)) return null
+    const { type, url, posterUrl, alt } = value
+    if (!(HERO_MEDIA_TYPES as readonly unknown[]).includes(type)) return null
+    if (typeof url !== 'string' || url === '') return null
+    return {
+        type: type as HeroMedia['type'],
+        url,
+        posterUrl: typeof posterUrl === 'string' && posterUrl !== '' ? posterUrl : null,
+        alt: typeof alt === 'string' ? alt : '',
+    }
+}
+
+/** URLs of the files a hero media points at (the media itself and its poster). */
+function heroMediaUrls(media: HeroMedia | null | undefined): string[] {
+    if (!media) return []
+    return media.posterUrl ? [media.url, media.posterUrl] : [media.url]
 }
 
 /**
@@ -64,11 +113,13 @@ export function mergeSection<K extends ContentSection>(
         const value = stored[field]
         if (value !== undefined && sameKind(value, fallback)) merged[field] = value
     }
+    if (section === 'home') merged.heroMedia = sanitizeHeroMedia(stored.heroMedia)
     return merged as unknown as SiteContent[K]
 }
 
 @Injectable()
 export class ContentService {
+    private readonly logger = new Logger(ContentService.name)
     /** Same rules and Spanish error format as the global pipe, applied to the section's DTO. */
     private readonly validation: ValidationPipe = createValidationPipe()
 
@@ -77,6 +128,7 @@ export class ContentService {
         private readonly entries: Repository<SiteContentEntry>,
         private readonly banks: BanksService,
         private readonly mobilePrefixes: MobilePrefixesService,
+        @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     ) {}
 
     /** Every section, stored values merged over the defaults. */
@@ -110,6 +162,7 @@ export class ContentService {
             metatype: CONTENT_SECTION_DTOS[key],
         })
         await this.checkCatalogFields(key, dto)
+        const previousHeroMedia = key === 'home' ? await this.storedHeroMedia() : null
 
         // One atomic upsert: two admins saving at once can never collide on the primary key.
         await this.entries.query(
@@ -123,14 +176,91 @@ export class ContentService {
             where: { key },
             relations: { updatedBy: true },
         })
+        if (key === 'home') {
+            await this.deleteUnusedHeroFiles(previousHeroMedia, (dto as HomeContent).heroMedia)
+        }
         return toAdminSection(key, saved ?? undefined)
     }
 
     /** Drops the stored value, so the section shows the built-in texts again. */
     async reset(section: string): Promise<AdminContentSectionDto> {
         const key = this.assertSection(section)
+        const previousHeroMedia = key === 'home' ? await this.storedHeroMedia() : null
         await this.entries.delete({ key })
+        if (key === 'home') await this.deleteUnusedHeroFiles(previousHeroMedia, null)
         return toAdminSection(key, undefined)
+    }
+
+    /**
+     * Stores the hero media (and its optional poster) after checking the real file type.
+     * Nothing is published until the home section is saved with the returned URL.
+     */
+    async uploadHeroMedia(
+        file: Express.Multer.File | undefined,
+        poster: Express.Multer.File | undefined,
+    ): Promise<HeroMediaUploadDto> {
+        if (!file) {
+            throw new BadRequestException(
+                `Adjunta la imagen o el video en el campo "${HERO_MEDIA_FIELD}".`,
+            )
+        }
+        const type = checkedMediaType(file, INVALID_HERO_MEDIA_TYPE)
+        const posterType = poster ? checkedMediaType(poster, INVALID_HERO_POSTER_TYPE) : null
+        if (posterType && mediaKind(posterType) !== 'image') {
+            throw new BadRequestException(INVALID_HERO_POSTER_TYPE)
+        }
+
+        const stored: StoredMediaRef[] = []
+        try {
+            const media = await this.storage.uploadMedia({ buffer: file.buffer, type }, 'hero')
+            stored.push({ publicId: media.publicId, kind: mediaKind(type) })
+            const posterFile =
+                poster && posterType
+                    ? await this.storage.uploadMedia(
+                          { buffer: poster.buffer, type: posterType },
+                          'hero',
+                      )
+                    : null
+            return {
+                url: media.url,
+                publicId: media.publicId,
+                type: mediaKind(type),
+                posterUrl: posterFile?.url ?? null,
+            }
+        } catch (error) {
+            for (const ref of stored) await this.deleteHeroFile(ref)
+            this.logger.error('Hero media upload failed', error as Error)
+            throw new BadRequestException('No pudimos guardar el archivo. Intenta de nuevo.')
+        }
+    }
+
+    /** The hero media currently saved, before a change replaces it. */
+    private async storedHeroMedia(): Promise<HeroMedia | null> {
+        const row = await this.entries.findOne({ where: { key: 'home' } })
+        return isPlainObject(row?.value) ? sanitizeHeroMedia(row.value.heroMedia) : null
+    }
+
+    /**
+     * Deletes the uploaded files the previous hero media used and the new one no longer does
+     * (replaced or removed). URLs we did not upload are left alone; a failure only leaves an
+     * orphan file.
+     */
+    private async deleteUnusedHeroFiles(
+        previous: HeroMedia | null,
+        next: HeroMedia | null,
+    ): Promise<void> {
+        const kept = new Set(heroMediaUrls(next))
+        for (const url of heroMediaUrls(previous)) {
+            if (kept.has(url)) continue
+            const stored = this.storage.mediaFromUrl(url, 'hero')
+            if (stored) await this.deleteHeroFile(stored)
+        }
+    }
+
+    private async deleteHeroFile(stored: StoredMediaRef): Promise<void> {
+        await this.storage.deleteMedia(stored).catch((error: unknown) => {
+            this.logger.warn(`Could not delete hero media "${stored.publicId}": ${String(error)}`)
+        })
     }
 
     /**
@@ -154,6 +284,7 @@ export class ContentService {
             await checkPhone('phone', payment.phone)
         }
         if (section === 'contact') await checkPhone('whatsapp', (dto as ContactContent).whatsapp)
+        if (section === 'home') details.push(...this.heroMediaProblems(dto as HomeContent))
 
         if (details.length) {
             throw new BadRequestException({
@@ -165,9 +296,69 @@ export class ContentService {
         }
     }
 
+    /**
+     * The hero media must point at one of our uploads (of the declared kind) or at an https URL.
+     * Normalizes the optional parts: a missing media is null, an image has no poster.
+     */
+    private heroMediaProblems(home: HomeContent): { field: string; errors: string[] }[] {
+        home.heroMedia ??= null
+        const media = home.heroMedia
+        if (!media) return []
+        if (media.type === 'image') media.posterUrl = null
+        media.posterUrl ??= null
+
+        const problems: { field: string; errors: string[] }[] = []
+        const check = (field: string, url: string, kind: HeroMedia['type'], label: string) => {
+            const stored = this.storage.mediaFromUrl(url, 'hero')
+            if (stored) {
+                if (stored.kind !== kind) {
+                    problems.push({
+                        field,
+                        errors: [
+                            kind === 'video'
+                                ? `${label} debe ser un video.`
+                                : `${label} debe ser una imagen.`,
+                        ],
+                    })
+                }
+                return
+            }
+            if (!isHttpsUrl(url)) {
+                problems.push({
+                    field,
+                    errors: [`${label} debe ser un archivo subido o un enlace https://.`],
+                })
+            }
+        }
+        check('heroMedia.url', media.url, media.type, 'El archivo de la portada')
+        if (media.posterUrl) {
+            check('heroMedia.posterUrl', media.posterUrl, 'image', 'La imagen previa del video')
+        }
+        return problems
+    }
+
     private assertSection(section: string): ContentSection {
         if (!isContentSection(section)) throw new NotFoundException(unknownSectionMessage(section))
         return section
+    }
+}
+
+/** The real type of an uploaded hero file; images are held to their own, smaller limit. */
+function checkedMediaType(file: Express.Multer.File, invalidMessage: string): MediaType {
+    const type = detectMediaType(file.buffer)
+    if (!type) throw new BadRequestException(invalidMessage)
+    if (mediaKind(type) === 'image' && file.size > MAX_HERO_IMAGE_BYTES) {
+        throw new PayloadTooLargeException(HERO_IMAGE_TOO_LARGE)
+    }
+    return type
+}
+
+function isHttpsUrl(value: string): boolean {
+    try {
+        const url = new URL(value)
+        return url.protocol === 'https:' && url.hostname !== ''
+    } catch {
+        return false
     }
 }
 

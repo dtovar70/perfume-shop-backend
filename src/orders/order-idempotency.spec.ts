@@ -15,7 +15,7 @@ const DTO = {
     city: 'Caracas',
     address: 'Av. Principal',
     deliveryMethod: 'delivery',
-    items: [{ productId: 'mug-001', variantId: 'v-15oz', quantity: 2 }],
+    items: [{ productId: 'perfume-001', variantId: 'v-15oz', quantity: 2 }],
 } as unknown as CreateOrderDto
 
 describe('order idempotency', () => {
@@ -44,7 +44,7 @@ describe('order idempotency', () => {
         expect(
             checkoutRequestHash({
                 ...DTO,
-                items: [{ productId: 'mug-001', variantId: 'v-15oz', quantity: 3 }],
+                items: [{ productId: 'perfume-001', variantId: 'v-15oz', quantity: 3 }],
             }),
         ).not.toBe(hash)
     })

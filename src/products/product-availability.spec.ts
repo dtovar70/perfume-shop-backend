@@ -1,22 +1,24 @@
 import { resolveAvailability } from './product-availability.js'
 
 const PRODUCTS = [
-    { id: 'mug', stock: 8, isActive: true },
+    { id: 'khamrah', stock: 8, isActive: true },
     { id: 'key', stock: 3, isActive: true },
     { id: 'off', stock: 9, isActive: false },
     { id: 'neg', stock: -2, isActive: true },
 ]
 const VARIANTS = [
-    { id: 'v-11', productId: 'mug', stock: 3 },
-    { id: 'v-15', productId: 'mug', stock: 5 },
+    { id: 'v-11', productId: 'khamrah', stock: 3 },
+    { id: 'v-15', productId: 'khamrah', stock: 5 },
     { id: 'v-off', productId: 'off', stock: 0 },
 ]
 
 describe('resolveAvailability', () => {
     it('reads the stock of the chosen variant', () => {
         expect(
-            resolveAvailability([{ productId: 'mug', variantId: 'v-15' }], PRODUCTS, VARIANTS),
-        ).toEqual([{ productId: 'mug', variantId: 'v-15', stock: 5, isActive: true, exists: true }])
+            resolveAvailability([{ productId: 'khamrah', variantId: 'v-15' }], PRODUCTS, VARIANTS),
+        ).toEqual([
+            { productId: 'khamrah', variantId: 'v-15', stock: 5, isActive: true, exists: true },
+        ])
     })
 
     it('reads the product stock when the product has no variants', () => {
@@ -28,17 +30,17 @@ describe('resolveAvailability', () => {
     it('keeps the request order and repeats duplicated lines', () => {
         const result = resolveAvailability(
             [
-                { productId: 'mug', variantId: 'v-11' },
+                { productId: 'khamrah', variantId: 'v-11' },
                 { productId: 'key' },
-                { productId: 'mug', variantId: 'v-11' },
+                { productId: 'khamrah', variantId: 'v-11' },
             ],
             PRODUCTS,
             VARIANTS,
         )
         expect(result.map((item) => [item.productId, item.variantId, item.stock])).toEqual([
-            ['mug', 'v-11', 3],
+            ['khamrah', 'v-11', 3],
             ['key', null, 3],
-            ['mug', 'v-11', 3],
+            ['khamrah', 'v-11', 3],
         ])
     })
 
@@ -52,9 +54,9 @@ describe('resolveAvailability', () => {
         const result = resolveAvailability(
             [
                 { productId: 'nope', variantId: 'v-11' },
-                { productId: 'mug', variantId: 'gone' },
+                { productId: 'khamrah', variantId: 'gone' },
                 { productId: 'key', variantId: 'v-11' },
-                { productId: 'mug' },
+                { productId: 'khamrah' },
             ],
             PRODUCTS,
             VARIANTS,

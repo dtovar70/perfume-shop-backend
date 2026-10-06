@@ -9,7 +9,7 @@ function receipt(items: number): ReceiptData {
             phone: '0414-5086536',
             whatsapp: '0414-5086536',
             email: 'hola@kaizen.com',
-            city: 'Quíbor, estado Lara',
+            city: 'Caracas',
             instagram: 'kaizen.perfumeria',
         },
         code: 'KZ-000012',

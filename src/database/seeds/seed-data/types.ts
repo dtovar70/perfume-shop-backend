@@ -1,5 +1,5 @@
 /** Seed-only shapes: the KaiZen starter catalog. */
-export type SeedCategorySlug = 'arabes' | 'europeos' | 'mujer' | 'hombre' | 'unisex' | 'sets-regalo'
+export type SeedCategorySlug = 'arabes' | 'europeos' | 'sets-regalo'
 
 export type SeedBrandSlug =
     | 'lattafa'

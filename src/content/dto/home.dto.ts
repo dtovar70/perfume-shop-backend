@@ -1,7 +1,21 @@
-import { Type } from 'class-transformer'
-import { ValidateNested } from 'class-validator'
-import { feminine, masculine, type FieldName } from '../../common/validation/messages.js'
-import type { HomeContent, HomeStep, HomeTestimonial } from '../content.types.js'
+import { Transform, Type } from 'class-transformer'
+import {
+    IsIn,
+    IsNotEmpty,
+    IsObject,
+    IsOptional,
+    IsString,
+    MaxLength,
+    ValidateNested,
+} from 'class-validator'
+import { feminine, masculine, msg, type FieldName } from '../../common/validation/messages.js'
+import {
+    HERO_MEDIA_TYPES,
+    type HeroMedia,
+    type HomeContent,
+    type HomeStep,
+    type HomeTestimonial,
+} from '../content.types.js'
 import { CONTENT_LIST_SIZES, CONTENT_LIMITS as MAX } from './content-limits.js'
 import { ContentList, ContentText, ContentTextList } from './content-validation.js'
 
@@ -34,8 +48,40 @@ export class HomeTestimonialDto implements HomeTestimonial {
     product: string
 }
 
+const mediaUrl = masculine('El archivo de la portada')
+const posterUrl = feminine('La imagen previa del video')
+
+/**
+ * Shape and lengths only. Whether a URL is acceptable (one of our uploads or https) depends on
+ * the storage driver, so `ContentService` checks it after this DTO.
+ */
+export class HeroMediaDto implements HeroMedia {
+    @IsIn(HERO_MEDIA_TYPES, { message: msg.invalid(masculine('El tipo de archivo de la portada')) })
+    type: HeroMedia['type']
+
+    @IsString({ message: msg.text(mediaUrl) })
+    @IsNotEmpty({ message: msg.required(mediaUrl) })
+    @MaxLength(MAX.mediaUrl, { message: msg.maxLength(mediaUrl, MAX.mediaUrl) })
+    url: string
+
+    /** Empty or missing means none. */
+    @Transform(({ value }: { value: unknown }) =>
+        value === undefined || value === '' ? null : value,
+    )
+    @IsOptional()
+    @IsString({ message: msg.text(posterUrl) })
+    @MaxLength(MAX.mediaUrl, { message: msg.maxLength(posterUrl, MAX.mediaUrl) })
+    posterUrl: string | null
+
+    @ContentText(masculine('El texto alternativo de la portada'), {
+        max: MAX.mediaAlt,
+        optional: true,
+    })
+    alt: string
+}
+
 export class HomeContentDto implements HomeContent {
-    @ContentText(feminine('La etiqueta de la portada'), { max: MAX.label })
+    @ContentText(feminine('La etiqueta de la portada'), { max: MAX.label, optional: true })
     heroBadge: string
 
     @ContentText(masculine('El titular de la portada'), { max: MAX.title, highlights: true })
@@ -56,6 +102,14 @@ export class HomeContentDto implements HomeContent {
         item: (position) => feminine(`La ventaja ${position}`),
     })
     heroFeatures: string[]
+
+    /** Optional: older admin clients do not send it, which means none. */
+    @Transform(({ value }: { value: unknown }) => (value === undefined ? null : value))
+    @IsOptional()
+    @IsObject({ message: msg.invalid(feminine('La imagen o video de portada')) })
+    @ValidateNested()
+    @Type(() => HeroMediaDto)
+    heroMedia: HeroMediaDto | null
 
     @ContentText(eyebrow('las categorías'), { max: MAX.label })
     categoriesEyebrow: string

@@ -74,7 +74,7 @@ describe('App (e2e)', () => {
     })
 
     it('DELETE /api/admin/categories/:slug without a session is rejected', () => {
-        return request(app.getHttpServer()).delete('/api/admin/categories/mugs').expect(401)
+        return request(app.getHttpServer()).delete('/api/admin/categories/arabes').expect(401)
     })
 
     it('GET /api/products rejects unknown sort values with a Spanish message', async () => {
@@ -97,7 +97,7 @@ describe('App (e2e)', () => {
 
     it('GET /api/products/:slug/related rejects unknown query params in Spanish', async () => {
         const response = await request(app.getHttpServer())
-            .get('/api/products/taza/related?limit=2&foo=1')
+            .get('/api/products/lattafa-khamrah/related?limit=2&foo=1')
             .expect(400)
         expect(response.body.details).toEqual([
             { field: 'foo', errors: ['El campo "foo" no está permitido.'] },

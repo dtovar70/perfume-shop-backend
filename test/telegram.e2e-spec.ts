@@ -80,7 +80,7 @@ describe('Telegram bot (e2e, fake Bot API)', () => {
                 deliveryMethod: 'delivery',
                 items: [
                     {
-                        productId: 'mug-001',
+                        productId: 'perfume-001',
                         variantId: 'v-15oz',
                         quantity: 2,
                     },
@@ -208,7 +208,7 @@ describe('Telegram bot (e2e, fake Bot API)', () => {
                 mode: 'webhook',
                 connected: true,
                 username: 'kaizen_test_bot',
-                name: 'Manada Test',
+                name: 'KaiZen Test',
                 error: null,
             },
             chats: [],
@@ -367,7 +367,7 @@ describe('Telegram bot (e2e, fake Bot API)', () => {
             detectedAt: new Date().toISOString(),
             lines: [
                 {
-                    productId: 'mug-001',
+                    productId: 'perfume-001',
                     productName: 'Lattafa Khamrah',
                     requested: 2,
                     available: 0,
@@ -401,7 +401,7 @@ describe('Telegram bot (e2e, fake Bot API)', () => {
             detectedAt: new Date().toISOString(),
             lines: [
                 {
-                    productId: 'mug-001',
+                    productId: 'perfume-001',
                     variantId: 'v-15oz',
                     productName: 'Lattafa Khamrah',
                     variantLabel: '15 oz',
@@ -644,7 +644,7 @@ describe('Telegram bot (e2e, fake Bot API)', () => {
             email: 'ana@example.com',
             phone: '0414-1234567',
             topic: 'mayoreo',
-            message: 'Quiero 20 tazas & <franelas> para mi equipo.',
+            message: 'Quiero 20 perfumes & <estuches> para mi equipo.',
             ...overrides,
         })
         const send = (body: Row) => http().post('/api/contact').send(body)
@@ -674,7 +674,7 @@ describe('Telegram bot (e2e, fake Bot API)', () => {
             expect(text).toContain('✉️ ana@example.com')
             expect(text).toContain('📱 WhatsApp: 0414-1234567')
             expect(text).toContain('🏷️ Pedido por mayor')
-            expect(text).toContain('Quiero 20 tazas &amp; &lt;franelas&gt; para mi equipo.')
+            expect(text).toContain('Quiero 20 perfumes &amp; &lt;estuches&gt; para mi equipo.')
             expect(first?.parse_mode).toBe('HTML')
             const [button] = buttons(first?.reply_markup)
             expect(button?.text).toBe('💬 Abrir WhatsApp')

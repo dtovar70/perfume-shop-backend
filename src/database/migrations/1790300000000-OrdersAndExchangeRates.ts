@@ -17,7 +17,7 @@ const ORDER_STATUSES = [
 
 /**
  * Phase 3: BCV exchange rates, guest orders (items as snapshots), Pago Móvil payment proofs,
- * status history and internal notes. Order codes ("MR-000123") come from `order_code_seq`.
+ * status history and internal notes. Order codes (a prefix plus six digits) come from `order_code_seq`.
  */
 export class OrdersAndExchangeRates1790300000000 implements MigrationInterface {
     name = 'OrdersAndExchangeRates1790300000000'

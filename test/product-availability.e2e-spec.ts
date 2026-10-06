@@ -40,9 +40,9 @@ describe('Cart availability (e2e)', () => {
         db.setVariantStock('v-15oz', 1)
         const response = await check({
             items: [
-                { productId: 'mug-001', variantId: 'v-15oz' },
-                { productId: 'key-001' },
-                { productId: 'mug-001', variantId: 'v-11oz' },
+                { productId: 'perfume-001', variantId: 'v-15oz' },
+                { productId: 'perfume-003' },
+                { productId: 'perfume-001', variantId: 'v-11oz' },
             ],
         }).expect(200)
 
@@ -50,15 +50,21 @@ describe('Cart availability (e2e)', () => {
         expect(response.body).toEqual({
             items: [
                 {
-                    productId: 'mug-001',
+                    productId: 'perfume-001',
                     variantId: 'v-15oz',
                     stock: 1,
                     isActive: true,
                     exists: true,
                 },
-                { productId: 'key-001', variantId: null, stock: 3, isActive: true, exists: true },
                 {
-                    productId: 'mug-001',
+                    productId: 'perfume-003',
+                    variantId: null,
+                    stock: 3,
+                    isActive: true,
+                    exists: true,
+                },
+                {
+                    productId: 'perfume-001',
                     variantId: 'v-11oz',
                     stock: 3,
                     isActive: true,
@@ -73,8 +79,8 @@ describe('Cart availability (e2e)', () => {
             items: [
                 { productId: 'off-001' },
                 { productId: 'gone-001', variantId: 'v-15oz' },
-                { productId: 'tee-001', variantId: 'v-15oz' },
-                { productId: 'mug-001', variantId: '' },
+                { productId: 'perfume-002', variantId: 'v-15oz' },
+                { productId: 'perfume-001', variantId: '' },
             ],
         }).expect(200)
 
@@ -87,9 +93,15 @@ describe('Cart availability (e2e)', () => {
                 isActive: false,
                 exists: false,
             },
-            { productId: 'tee-001', variantId: 'v-15oz', stock: 0, isActive: true, exists: false },
+            {
+                productId: 'perfume-002',
+                variantId: 'v-15oz',
+                stock: 0,
+                isActive: true,
+                exists: false,
+            },
             // A product with variants needs one (the checkout refuses the line otherwise).
-            { productId: 'mug-001', variantId: null, stock: 0, isActive: true, exists: false },
+            { productId: 'perfume-001', variantId: null, stock: 0, isActive: true, exists: false },
         ])
     })
 
@@ -100,7 +112,7 @@ describe('Cart availability (e2e)', () => {
         ])
 
         const tooMany = Array.from({ length: AVAILABILITY_MAX_ITEMS + 1 }, () => ({
-            productId: 'mug-001',
+            productId: 'perfume-001',
         }))
         const capped = await check({ items: tooMany }).expect(400)
         expect(capped.body.details[0]).toEqual({

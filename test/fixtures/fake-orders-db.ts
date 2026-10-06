@@ -83,31 +83,26 @@ export class FakeDb {
             colorHex: '#FFD979',
             sortOrder: 0,
         })
-        this.table(Category).push(
-            category('mugs'),
-            category('tees'),
-            category('keychains'),
-            category('coolers'),
-        )
+        this.table(Category).push(category('arabes'), category('europeos'), category('sets-regalo'))
         this.table(Product).push(
             {
-                id: 'mug-001',
-                slug: 'taza',
+                id: 'perfume-001',
+                slug: 'lattafa-khamrah',
                 name: 'Lattafa Khamrah',
                 price: 12.9,
                 stock: 8,
                 isActive: true,
-                categorySlug: 'mugs',
+                categorySlug: 'arabes',
                 tags: [],
             },
             {
-                id: 'tee-001',
-                slug: 'franela',
+                id: 'perfume-002',
+                slug: 'khamrah',
                 name: 'Khamrah',
                 price: 20,
                 stock: 1,
                 isActive: true,
-                categorySlug: 'tees',
+                categorySlug: 'europeos',
                 tags: [],
             },
             {
@@ -117,26 +112,26 @@ export class FakeDb {
                 price: 5,
                 stock: 9,
                 isActive: false,
-                categorySlug: 'mugs',
+                categorySlug: 'arabes',
                 tags: [],
             },
             // No variants: the product row holds its own stock.
             {
-                id: 'key-001',
-                slug: 'llavero',
+                id: 'perfume-003',
+                slug: 'asad',
                 name: 'Asad',
                 price: 4,
                 stock: 3,
                 isActive: true,
-                categorySlug: 'keychains',
+                categorySlug: 'arabes',
                 tags: [],
             },
         )
-        // Stock per variant; `products.stock` is their sum (8 for the mug, 1 for the tee).
+        // Stock per variant; `products.stock` is their sum (8 for Lattafa Khamrah, 1 for Khamrah).
         this.table(ProductVariant).push(
             {
                 id: 'v-11oz',
-                productId: 'mug-001',
+                productId: 'perfume-001',
                 label: '11 oz',
                 priceDelta: 0,
                 stock: 3,
@@ -144,18 +139,25 @@ export class FakeDb {
             },
             {
                 id: 'v-15oz',
-                productId: 'mug-001',
+                productId: 'perfume-001',
                 label: '15 oz',
                 priceDelta: 3.1,
                 stock: 5,
                 sortOrder: 1,
             },
-            { id: 'v-m', productId: 'tee-001', label: 'M', priceDelta: 0, stock: 1, sortOrder: 0 },
+            {
+                id: 'v-m',
+                productId: 'perfume-002',
+                label: 'M',
+                priceDelta: 0,
+                stock: 1,
+                sortOrder: 0,
+            },
         )
         this.table(ProductImage).push({
             id: 'img-1',
-            productId: 'mug-001',
-            url: 'http://img/taza.jpg',
+            productId: 'perfume-001',
+            url: 'http://img/lattafa-khamrah.jpg',
             sortOrder: 0,
             createdAt: new Date(),
         })

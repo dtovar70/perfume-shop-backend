@@ -4,9 +4,9 @@ import type { LockedStock } from '../products/product-stock.js'
 import type { StockConflict, StockConflictLine } from './entities/order.entity.js'
 import { liveStockConflict, stockConflictProductIds } from './stock-conflict.js'
 
-function stock(mint: number, keychain = 0): LockedStock {
+function stock(mint: number, plainStock = 0): LockedStock {
     const acrylic = { id: 'key', stock: mint } as Product
-    const plain = { id: 'plain', stock: keychain } as Product
+    const plain = { id: 'plain', stock: plainStock } as Product
     return {
         products: new Map([
             [acrylic.id, acrylic],

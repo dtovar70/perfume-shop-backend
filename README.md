@@ -302,10 +302,10 @@ the stock is enough (per-line Spanish errors, `400 ORDER_ITEMS_INVALID` with `de
 subtotal, shipping (content `shipping`: free at the threshold, flat rate below, 0 for store
 pickup), the USD total and the Bs total with the current BCV rate (snapshot of rate, source and
 fecha valor), decrements the stock and stores the items as snapshots (name, variant label, unit
-price, slug, first photo). The code is sequential (`MR-000123`, sequence `order_code_seq`).
+price, slug, first photo). The code is sequential (`KZ-000123`, sequence `order_code_seq`).
 
 **Private links.** The response carries `accessToken` (32 random bytes, base64url) once; only its
-SHA-256 is stored. The customer page is `/pedido/MR-000123?t=<token>`; a wrong or missing token is a
+SHA-256 is stored. The customer page is `/pedido/KZ-000123?t=<token>`; a wrong or missing token is a
 plain `404`. An order may have several links (`order_access_links`: `order_id` → `orders`
 `ON DELETE CASCADE`, unique `token_hash`, `created_by` → `users` (null for the checkout link),
 `created_at`, `revoked_at`): checkout issues the first, and the admin issues new ones (the stored
@@ -432,7 +432,7 @@ Public (write routes throttled to 10 per 10 minutes per IP):
 - `GET /orders/:code?t=` → the customer's order (Pago Móvil details, totals, payments, history,
   `receiptAvailable`)
 - `GET /orders/:code/receipt.pdf?t=` → the purchase receipt (`attachment;
-filename="comprobante-MR-000012.pdf"`, 20 per 10 minutes per IP; `404` with a bad token, `409`
+filename="comprobante-KZ-000012.pdf"`, 20 per 10 minutes per IP; `404` with a bad token, `409`
   before the payment is verified or once cancelled)
 - `POST /orders/lookup` `{ code, email }` ("Consultar mi pedido"; 5 per 15 minutes per IP, 3 per
   email and 3 per code, `429` past that) → always `202 { message: "Si los datos coinciden, te
@@ -518,7 +518,7 @@ admin who created the code. Anyone else gets "este es un bot privado" and never 
 Groups are ignored.
 
 **In the chat:** `/pendientes` (up to 10 payments waiting, each with its buttons), `/pedido
-MR-000012` (or `/pedido 12`), `/micuenta` (the linked panel account), `/ayuda`, `/salir` (unlinks after a confirmation). **Rechazar**
+KZ-000012` (or `/pedido 12`), `/micuenta` (the linked panel account), `/ayuda`, `/salir` (unlinks after a confirmation). **Rechazar**
 offers quick reasons ("Monto incompleto", "No encontramos el pago", "Referencia inválida") or
 "Otro motivo…", which asks for a typed reason (ForceReply, max. 500 characters, 10 minutes). The
 reason is what the customer reads on the order page. After a rejection the message offers
@@ -622,7 +622,7 @@ Every customer value is escaped.
 - **Consultar mi pedido** (`POST /orders/lookup` `{ code, email }`, `OrderLookupService`): the
   answer is always the same `202` right away; in the background, when an order has that code and
   that email (trimmed, case-insensitive) a fresh link is emailed to the order's address ("Tu
-  enlace para ver el pedido MR-…"). Rate limits: 5 per 15 minutes per IP (throttler), 3 per email
+  enlace para ver el pedido KZ-…"). Rate limits: 5 per 15 minutes per IP (throttler), 3 per email
   and 3 per code (in memory), `429` past that. With `MAIL_DRIVER=log` no link is issued.
 - **Password reset** codes and the "password changed" notice (see [Telegram bot](#telegram-bot)).
 

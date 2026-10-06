@@ -91,6 +91,24 @@ export interface HomeTestimonial {
     product: string
 }
 
+export const HERO_MEDIA_TYPES = ['image', 'video'] as const
+
+export type HeroMediaType = (typeof HERO_MEDIA_TYPES)[number]
+
+/**
+ * Photo or short video of the home hero, uploaded from the admin. Null shows the featured
+ * products instead.
+ */
+export interface HeroMedia {
+    type: HeroMediaType
+    /** Uploaded file (storage URL) or any https URL. */
+    url: string
+    /** Still frame shown before a video plays, or instead of it (reduced motion, data saver). */
+    posterUrl: string | null
+    /** Describes the media; empty marks it as decorative. */
+    alt: string
+}
+
 export interface HomeContent {
     heroBadge: string
     /** Accepts *highlights*. */
@@ -99,6 +117,7 @@ export interface HomeContent {
     heroPrimaryCta: string
     heroSecondaryCta: string
     heroFeatures: string[]
+    heroMedia: HeroMedia | null
     categoriesEyebrow: string
     categoriesTitle: string
     /** Accepts {categorias}. */

@@ -13,7 +13,7 @@ describe('Admin categories routes (e2e)', () => {
     let app: INestApplication
     const service = {
         reorder: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockResolvedValue({ slug: 'mugs' }),
+        update: vi.fn().mockResolvedValue({ slug: 'arabes' }),
     }
 
     beforeEach(async () => {
@@ -36,25 +36,25 @@ describe('Admin categories routes (e2e)', () => {
     it('PATCH /api/admin/categories/order reorders instead of updating a category', async () => {
         await request(app.getHttpServer())
             .patch('/api/admin/categories/order')
-            .send({ slugs: ['tees', 'mugs', 'keychains'] })
+            .send({ slugs: ['sets-regalo', 'arabes', 'europeos'] })
             .expect(200)
-        expect(service.reorder).toHaveBeenCalledWith(['tees', 'mugs', 'keychains'])
+        expect(service.reorder).toHaveBeenCalledWith(['sets-regalo', 'arabes', 'europeos'])
         expect(service.update).not.toHaveBeenCalled()
     })
 
     it('PATCH /api/admin/categories/:slug still updates a category', async () => {
         await request(app.getHttpServer())
-            .patch('/api/admin/categories/mugs')
+            .patch('/api/admin/categories/arabes')
             .send({ name: 'Perfumes' })
             .expect(200)
-        expect(service.update).toHaveBeenCalledWith('mugs', { name: 'Perfumes' })
+        expect(service.update).toHaveBeenCalledWith('arabes', { name: 'Perfumes' })
         expect(service.reorder).not.toHaveBeenCalled()
     })
 
     it('rejects repeated slugs in Spanish before reaching the service', async () => {
         const response = await request(app.getHttpServer())
             .patch('/api/admin/categories/order')
-            .send({ slugs: ['mugs', 'mugs'] })
+            .send({ slugs: ['arabes', 'arabes'] })
             .expect(400)
         expect(response.body.details).toEqual([
             {
