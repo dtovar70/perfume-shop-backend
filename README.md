@@ -139,6 +139,17 @@ The pool and per-connection limits are tunable with `DB_POOL_MAX` (10), `DB_STAT
 (5000), `DB_IDLE_TX_TIMEOUT_MS` (10000) and `DB_CONNECT_TIMEOUT_MS` (3000). They apply to the API
 only: the migration CLI keeps Postgres' defaults, so long index builds are never cut off.
 
+### Sitemap
+
+`GET /sitemap.xml` is served at the API's **root**, outside the `/api` prefix
+(`GLOBAL_PREFIX_OPTIONS` in `src/config/global-prefix.ts`): `<PUBLIC_API_URL>/sitemap.xml`. It
+lists the home, `/catalogo`, `/marcas`, every category and brand with active products
+(`/catalogo/<slug>`, `/catalogo?brand=<slug>`) and every active product (`/producto/<slug>`), on
+the storefront's address `PUBLIC_SITE_URL`, with `lastmod` from `updated_at` (a listing takes its
+newest product's). Cached in memory under the catalog prefix (dropped by every catalog write and
+stock change, 10 min TTL) and sent with `Cache-Control: public, max-age=3600`. The storefront's
+`robots.txt` points at it (its build writes the URL from `VITE_API_URL`).
+
 ## Endpoints (prefix `/api`)
 
 Public:

@@ -1,4 +1,7 @@
-import { type GlobalPrefixOptions, RequestMethod } from '@nestjs/common'
+import { type INestApplication, RequestMethod } from '@nestjs/common'
+
+/** Not exported by @nestjs/common's entry point. */
+type GlobalPrefixOptions = NonNullable<Parameters<INestApplication['setGlobalPrefix']>[1]>
 
 /** Every API route lives under `/api`. */
 export const API_PREFIX = 'api'

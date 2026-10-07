@@ -21,7 +21,9 @@ function rowsRepository(rows: Row[]) {
     return {
         find: vi.fn(({ where }: { where?: { isActive?: boolean } } = {}) =>
             Promise.resolve(
-                rows.filter((row) => where?.isActive === undefined || row.isActive === where.isActive),
+                rows.filter(
+                    (row) => where?.isActive === undefined || row.isActive === where.isActive,
+                ),
             ),
         ),
         findOneBy: () => Promise.resolve(null),
@@ -33,7 +35,13 @@ describe('Sitemap (e2e)', () => {
     const updatedAt = new Date('2026-10-01T10:00:00.000Z')
     const products = rowsRepository([
         { slug: 'yara', categorySlug: 'arabes', brandSlug: 'lattafa', updatedAt, isActive: true },
-        { slug: 'retirado', categorySlug: 'arabes', brandSlug: 'lattafa', updatedAt, isActive: false },
+        {
+            slug: 'retirado',
+            categorySlug: 'arabes',
+            brandSlug: 'lattafa',
+            updatedAt,
+            isActive: false,
+        },
     ])
     const brands = rowsRepository([
         { slug: 'lattafa', updatedAt, isActive: true },
