@@ -5,25 +5,12 @@ import cookieParser from 'cookie-parser'
 import request from 'supertest'
 import { AppModule } from '../src/app.module.js'
 import { createValidationPipe } from '../src/common/pipes/validation.pipe.js'
-import { MAIL_TRANSPORT, type MailTransport, type OutgoingMail } from '../src/mail/mail.types.js'
+import { MAIL_TRANSPORT, type OutgoingMail } from '../src/mail/mail.types.js'
 import { OrderLookupService } from '../src/orders/emails/order-lookup.service.js'
 import { OrderAccessLink } from '../src/orders/entities/order-access-link.entity.js'
 import { STORAGE_SERVICE, type StorageService } from '../src/storage/storage.service.js'
+import { FakeMailTransport } from './fixtures/fake-mail.js'
 import { FakeDb, type Row } from './fixtures/fake-orders-db.js'
-
-/** Catches every email instead of sending it. `delivers: false` behaves like MAIL_DRIVER=log. */
-class FakeMailTransport implements MailTransport {
-    readonly driver = 'smtp' as const
-    delivers = true
-    fail = false
-    sent: OutgoingMail[] = []
-
-    send(message: OutgoingMail): Promise<void> {
-        if (this.fail) return Promise.reject(new Error(`550 ${message.to}: mailbox unavailable`))
-        this.sent.push(message)
-        return Promise.resolve()
-    }
-}
 
 const LOOKUP_REQUESTED = { message: 'Si los datos coinciden, te enviamos un enlace a tu correo.' }
 
@@ -77,7 +64,7 @@ describe('Customer emails: "Pedido recibido" and "Consultar mi pedido" (e2e)', (
     const lookup = (code: string, email: string) =>
         http().post('/api/orders/lookup').send({ code, email })
 
-    /** The listener runs after the response; waits until `count` emails were caught. */
+    /** The outbox delivers after the response; waits until `count` emails were caught. */
     const emails = async (count: number): Promise<OutgoingMail[]> => {
         for (let tries = 0; mail.sent.length < count && tries < 100; tries++) {
             await new Promise((resolve) => setTimeout(resolve, 10))
@@ -85,7 +72,7 @@ describe('Customer emails: "Pedido recibido" and "Consultar mi pedido" (e2e)', (
         return mail.sent
     }
 
-    /** Lets the order.created listener finish (it may send nothing). */
+    /** Lets the outbox deliver the order.created email (it may send nothing). */
     const settle = () => new Promise((resolve) => setTimeout(resolve, 50))
 
     beforeEach(async () => {

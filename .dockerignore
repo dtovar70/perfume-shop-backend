@@ -1,0 +1,20 @@
+# Only package*.json, the Nest/TS configs and src/ are needed to build the image.
+node_modules
+dist
+coverage
+*.tsbuildinfo
+test
+uploads
+private-uploads
+.git
+.gitignore
+.vscode
+.idea
+*.log
+Dockerfile
+.dockerignore
+docker-compose.yml
+README.md
+# Secrets never go into the image: the container gets its variables at run time.
+.env
+.env.*

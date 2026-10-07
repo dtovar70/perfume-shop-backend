@@ -1,3 +1,4 @@
+import { MemoryCache } from '../cache/memory-cache.js'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import type { Repository } from 'typeorm'
 import { Role } from '../auth/role.enum.js'
@@ -82,6 +83,7 @@ function setup(rows: Partial<SiteContentEntry>[] = []) {
         banks as unknown as BanksService,
         mobilePrefixes as unknown as MobilePrefixesService,
         storage as unknown as StorageService,
+        new MemoryCache(),
     )
     return { service, entries, banks, mobilePrefixes, storage }
 }

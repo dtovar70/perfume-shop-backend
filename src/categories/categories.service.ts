@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import { CACHE_KEYS } from '../cache/cache-keys.js'
+import { MemoryCache } from '../cache/memory-cache.js'
 import { slugify } from '../common/utils/text.util.js'
 import { isDbError, omitUndefined } from '../database/db-errors.js'
 import { Product } from '../products/entities/product.entity.js'
@@ -108,10 +110,15 @@ export class CategoriesService {
         @InjectRepository(Category) private readonly categories: Repository<Category>,
         @InjectRepository(Product) private readonly products: Repository<Product>,
         @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
+        private readonly cache: MemoryCache,
     ) {}
 
     /** Public list, in menu order, with the count of visible products and the card images. */
-    async list(): Promise<CategoryDto[]> {
+    list(): Promise<CategoryDto[]> {
+        return this.cache.getOrSet(CACHE_KEYS.categories(), () => this.loadList())
+    }
+
+    private async loadList(): Promise<CategoryDto[]> {
         const [categories, counts, previews] = await Promise.all([
             this.findOrdered(),
             this.productCounts(),

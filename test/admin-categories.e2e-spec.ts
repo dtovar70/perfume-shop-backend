@@ -8,6 +8,7 @@ import {
 } from '../src/categories/categories.controller.js'
 import { CategoriesService } from '../src/categories/categories.service.js'
 import { Category } from '../src/categories/entities/category.entity.js'
+import { CacheModule } from '../src/cache/cache.module.js'
 import { createValidationPipe } from '../src/common/pipes/validation.pipe.js'
 import { Product } from '../src/products/entities/product.entity.js'
 import { STORAGE_SERVICE } from '../src/storage/storage.service.js'
@@ -26,6 +27,7 @@ describe('Admin categories routes (e2e)', () => {
     beforeEach(async () => {
         vi.clearAllMocks()
         const moduleFixture = await Test.createTestingModule({
+            imports: [CacheModule],
             controllers: [AdminCategoriesController],
             providers: [{ provide: CategoriesService, useValue: service }],
         }).compile()
@@ -164,6 +166,7 @@ describe('Category cover image (e2e)', () => {
         ])
 
         const moduleFixture = await Test.createTestingModule({
+            imports: [CacheModule],
             controllers: [CategoriesController, AdminCategoriesController],
             providers: [
                 CategoriesService,
@@ -223,6 +226,27 @@ describe('Category cover image (e2e)', () => {
         )
         expect(response.body.imageUrl).toBe('http://localhost:3000/uploads/categories/new.avif')
         expect(response.body).not.toHaveProperty('imagePublicId')
+    })
+
+    it('serves the public list from the cache until an admin write invalidates it', async () => {
+        const server = app.getHttpServer()
+        const first = await request(server).get('/api/categories').expect(200)
+        expect(first.headers['cache-control']).toBe(
+            'public, max-age=60, stale-while-revalidate=300',
+        )
+        await request(server).get('/api/categories').expect(200)
+        expect(categories.find).toHaveBeenCalledOnce()
+
+        categories.find.mockResolvedValue([{ ...row(), name: 'Perfumes árabes' }])
+        const write = await request(server)
+            .patch('/api/admin/categories/arabes')
+            .send({ name: 'Perfumes árabes' })
+            .expect(200)
+        expect(write.headers['cache-control']).toBeUndefined()
+
+        const after = await request(server).get('/api/categories').expect(200)
+        expect(after.body[0].name).toBe('Perfumes árabes')
+        expect(categories.find).toHaveBeenCalledTimes(2)
     })
 
     it('PATCH multipart replaces the cover and deletes the old file', async () => {

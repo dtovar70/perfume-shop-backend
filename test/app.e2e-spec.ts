@@ -1,4 +1,4 @@
-import type { INestApplication } from '@nestjs/common'
+import { type INestApplication, Logger } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { getDataSourceToken } from '@nestjs/typeorm'
 import request from 'supertest'
@@ -59,6 +59,31 @@ describe('App (e2e)', () => {
     it('GET /api/health is not throttled', async () => {
         for (let i = 0; i < 130; i++) {
             await request(app.getHttpServer()).get('/api/health').expect(200)
+        }
+    })
+
+    it('tags every response with a request id, reusing a safe incoming one', async () => {
+        const echoed = await request(app.getHttpServer())
+            .get('/api/auth/me')
+            .set('X-Request-Id', 'proxy-42')
+            .expect(401)
+        expect(echoed.headers['x-request-id']).toBe('proxy-42')
+
+        const fresh = await request(app.getHttpServer()).get('/api/health').expect(200)
+        expect(fresh.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/)
+    })
+
+    it('logs the matched route pattern of each request', async () => {
+        const log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined)
+        try {
+            await request(app.getHttpServer()).get('/api/products/featured?limit=999').expect(400)
+            await new Promise((resolve) => setImmediate(resolve))
+            const lines = log.mock.calls.map(([line]) => String(line))
+            expect(lines.some((line) => line.startsWith('GET /api/products/featured 400 '))).toBe(
+                true,
+            )
+        } finally {
+            log.mockRestore()
         }
     })
 

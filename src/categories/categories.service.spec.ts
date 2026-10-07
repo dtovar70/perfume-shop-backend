@@ -1,3 +1,4 @@
+import { MemoryCache } from '../cache/memory-cache.js'
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import type { Repository } from 'typeorm'
 import { QueryFailedError } from 'typeorm'
@@ -72,6 +73,7 @@ function setup(options: {
         categories as unknown as Repository<Category>,
         products as unknown as Repository<Product>,
         storage as unknown as StorageService,
+        new MemoryCache(),
     )
     return { service, categories, products, storage }
 }
@@ -212,6 +214,7 @@ function setupReorder(existing: string[]) {
         categories as unknown as Repository<Category>,
         products as unknown as Repository<Product>,
         storageMock() as unknown as StorageService,
+        new MemoryCache(),
     )
     return { service, categories, manager }
 }

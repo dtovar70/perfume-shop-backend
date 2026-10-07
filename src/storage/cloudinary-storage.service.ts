@@ -25,6 +25,14 @@ const PRIVATE_ROOT = 'kaizen/private'
 const PRIVATE_URL_TTL_SECONDS = 5 * 60
 /** `<folder>/<public_id>.<format>`, as built by `uploadPrivate`. */
 const PRIVATE_KEY = /^kaizen\/private\/(payment-proofs)\/[A-Za-z0-9_-]+\.(jpg|png|webp)$/
+/**
+ * Socket inactivity limits per call (the SDK only reads `timeout` per request, not from the
+ * global config; its default is 60 s). An upload streams the file, so it gets more room than a
+ * delete; either way a stalled Cloudinary never holds an admin request (and its DB connection
+ * slot) for long.
+ */
+const UPLOAD_TIMEOUT_MS = 30_000
+const DESTROY_TIMEOUT = { timeout: 10_000 }
 
 function uploadBuffer(
     buffer: Buffer,
@@ -32,7 +40,7 @@ function uploadBuffer(
 ): Promise<UploadApiResponse> {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            options,
+            { ...options, timeout: UPLOAD_TIMEOUT_MS },
             (error, result?: UploadApiResponse) => {
                 if (error || !result) {
                     reject(new Error(error?.message ?? 'Cloudinary upload failed'))
@@ -85,7 +93,11 @@ export class CloudinaryStorageService implements StorageService {
     }
 
     async delete(publicId: string): Promise<void> {
-        await cloudinary.uploader.destroy(publicId, { resource_type: 'image', invalidate: true })
+        await cloudinary.uploader.destroy(publicId, {
+            resource_type: 'image',
+            invalidate: true,
+            ...DESTROY_TIMEOUT,
+        })
     }
 
     /** Videos are a separate Cloudinary resource type (`video`), with their own delivery URLs. */
@@ -107,6 +119,7 @@ export class CloudinaryStorageService implements StorageService {
         await cloudinary.uploader.destroy(media.publicId, {
             resource_type: media.kind,
             invalidate: true,
+            ...DESTROY_TIMEOUT,
         })
     }
 
@@ -142,6 +155,7 @@ export class CloudinaryStorageService implements StorageService {
             resource_type: 'image',
             type: 'authenticated',
             invalidate: true,
+            ...DESTROY_TIMEOUT,
         })
     }
 }

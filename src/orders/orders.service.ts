@@ -333,6 +333,8 @@ export class OrdersService {
                     createdAt: now.toISOString(),
                 },
             })
+            // In the order's transaction: no "Pedido recibido" without the order, and vice versa.
+            await this.statuses.recordEvents(manager, pending)
             return created
         })
 
@@ -516,6 +518,8 @@ export class OrdersService {
                     },
                     ...transitionEvents,
                 )
+                // In the payment's transaction: the owner hears of every recorded payment.
+                await this.statuses.recordEvents(manager, pending)
             })
         } catch (error) {
             if (proofKey) {
@@ -569,6 +573,10 @@ export class OrdersService {
      * Other payments with this reference on orders that are still alive. References are the
      * last 6 digits; older payments stored the whole number, so they are compared by its end.
      * A match only flags the payments for the admin, it never refuses one.
+     *
+     * The digit count is inlined (not a bind parameter) so the expression is literally
+     * `RIGHT("reference", 6)` and always matches the `order_payments_reference_tail_idx`
+     * expression index, whatever plan Postgres picks.
      */
     private async findDuplicateReferences(
         manager: EntityManager,
@@ -578,8 +586,9 @@ export class OrdersService {
         const rows = (await manager.query(
             `SELECT p."id" FROM "order_payments" p
              JOIN "orders" o ON o."id" = p."order_id"
-             WHERE RIGHT(p."reference", $4) = $1 AND p."order_id" <> $2 AND o."status" <> ALL($3)`,
-            [reference, orderId, CLOSED_STATUSES, REFERENCE_DIGITS],
+             WHERE RIGHT(p."reference", ${REFERENCE_DIGITS}) = $1
+               AND p."order_id" <> $2 AND o."status" <> ALL($3)`,
+            [reference, orderId, CLOSED_STATUSES],
         )) as { id: string }[]
         return rows.map((row) => row.id)
     }

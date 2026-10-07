@@ -26,7 +26,7 @@ import type { PublicOrderDto } from './order.mapper.js'
 import { OrdersService, type CreatedOrderDto } from './orders.service.js'
 import { sendReceipt } from './receipt/send-receipt.js'
 import { ReceiptService } from './receipt/receipt.service.js'
-import { PROOF_FIELD, PROOF_UPLOAD_OPTIONS, ProofUploadErrorsFilter } from './payment-upload.js'
+import { PROOF_FIELD, PROOF_UPLOAD } from './payment-upload.js'
 import { IDEMPOTENCY_KEY_HEADER, parseIdempotencyKey } from './order-idempotency.js'
 
 /** Per client IP: 10 new orders / payment proofs every 10 minutes. */
@@ -108,8 +108,8 @@ export class OrdersController {
     @HttpCode(HttpStatus.OK)
     @Throttle(WRITE_LIMIT)
     @Header('Cache-Control', 'no-store')
-    @UseFilters(ProofUploadErrorsFilter)
-    @UseInterceptors(FileInterceptor(PROOF_FIELD, PROOF_UPLOAD_OPTIONS))
+    @UseFilters(PROOF_UPLOAD.filter)
+    @UseInterceptors(FileInterceptor(PROOF_FIELD, PROOF_UPLOAD.options))
     submitPayment(
         @Param('code') code: string,
         @Query() query: OrderAccessQueryDto,

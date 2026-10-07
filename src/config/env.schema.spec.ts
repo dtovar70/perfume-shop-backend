@@ -288,3 +288,20 @@ describe('envSchema (production)', () => {
         ).not.toThrow()
     })
 })
+
+describe('envSchema (database pool)', () => {
+    it('defaults the pool size and timeouts', () => {
+        const env = validateEnv(BASE)
+        expect(env.DB_POOL_MAX).toBe(10)
+        expect(env.DB_STATEMENT_TIMEOUT_MS).toBe(5000)
+        expect(env.DB_IDLE_TX_TIMEOUT_MS).toBe(10_000)
+        expect(env.DB_CONNECT_TIMEOUT_MS).toBe(3000)
+    })
+
+    it('coerces overrides and rejects a pool without connections', () => {
+        const env = validateEnv({ ...BASE, DB_POOL_MAX: '4', DB_STATEMENT_TIMEOUT_MS: '0' })
+        expect(env.DB_POOL_MAX).toBe(4)
+        expect(env.DB_STATEMENT_TIMEOUT_MS).toBe(0)
+        expect(envSchema.safeParse({ ...BASE, DB_POOL_MAX: '0' }).success).toBe(false)
+    })
+})

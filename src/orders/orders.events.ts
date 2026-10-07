@@ -2,9 +2,11 @@ import type { PaymentSource } from './entities/order-payment.entity.js'
 import type { ActorKind, OrderStatus, RefundStatus } from './order-status.js'
 
 /**
- * Domain events emitted after the change is committed. Listeners (e.g. the Phase 4 Telegram
- * bot) subscribe with `@OnEvent(ORDER_EVENTS.created)` and never touch the order logic; to act
- * on an order they call `OrderStatusService.transition()` like the admin API does.
+ * Domain events of an order change. Notifications (customer emails, the Telegram bot) are
+ * OutboxHandlers of these events: their rows are written in the change's transaction and
+ * delivered with retries. The events are also emitted after commit for in-process reactions
+ * (`@OnEvent`: cache invalidation, waking the outbox worker). Neither side touches the order
+ * logic; to act on an order they call `OrderStatusService.transition()` like the admin API does.
  */
 export const ORDER_EVENTS = {
     created: 'order.created',

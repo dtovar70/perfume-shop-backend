@@ -10,6 +10,7 @@ import { TelegramMessage } from './entities/telegram-message.entity.js'
 import { TelegramBotService } from './telegram-bot.service.js'
 import { TelegramContactService } from './telegram-contact.service.js'
 import { TelegramEventsListener } from './telegram-events.listener.js'
+import { TELEGRAM_OUTBOX_HANDLERS } from './telegram-outbox.handlers.js'
 import { TelegramPasswordResetChannel } from './telegram-password-reset.channel.js'
 import { TelegramPaymentsService } from './telegram-payments.service.js'
 import { TelegramStoreService } from './telegram-store.service.js'
@@ -38,6 +39,7 @@ import { TelegramWebhookController } from './telegram-webhook.controller.js'
         AdminTelegramService,
         TelegramPasswordResetChannel,
         TelegramContactService,
+        ...TELEGRAM_OUTBOX_HANDLERS,
     ],
     // Password recovery sends its codes through the bot; the contact form checks it can deliver.
     exports: [TelegramPasswordResetChannel, TelegramContactService],

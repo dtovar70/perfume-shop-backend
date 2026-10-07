@@ -118,6 +118,14 @@ const envObject = z.object({
                 .filter(Boolean),
         ),
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+    /** Connections the API keeps in its Postgres pool. */
+    DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+    /** Postgres cancels any single API statement running longer than this (0 = no limit). */
+    DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).default(5000),
+    /** Postgres closes a transaction left idle this long, releasing its row locks (0 = never). */
+    DB_IDLE_TX_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
+    /** How long a request waits for a pooled connection before failing (0 = forever). */
+    DB_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(0).default(3000),
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters long'),
     /** Admin inactivity limit before the "extend session?" prompt shows up. */
     SESSION_IDLE_MINUTES: z.coerce.number().int().min(1).max(1440).default(30),

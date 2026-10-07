@@ -1,7 +1,9 @@
+import { CacheInvalidator } from '../cache/cache-invalidator.js'
+import { MemoryCache } from '../cache/memory-cache.js'
 import type { ConfigService } from '@nestjs/config'
 import type { EventEmitter2 } from '@nestjs/event-emitter'
 import type { SchedulerRegistry } from '@nestjs/schedule'
-import type { Repository } from 'typeorm'
+import type { DataSource, Repository } from 'typeorm'
 import type { Env } from '../config/env.schema.js'
 import type { ExchangeRate } from './entities/exchange-rate.entity.js'
 import { EXCHANGE_RATE_EVENTS } from './exchange-rate.events.js'
@@ -61,12 +63,16 @@ describe('ExchangeRateService sync alerts', () => {
                 ],
         } as unknown as ConfigService<Env, true>
         const emit = vi.fn()
+        const cache = new MemoryCache()
         const service = new ExchangeRateService(
+            {} as DataSource,
             rates,
             [provider('bcv'), provider('dolarapi')],
             config,
             {} as SchedulerRegistry,
             { emit } as unknown as EventEmitter2,
+            cache,
+            new CacheInvalidator(cache),
         )
         return {
             service,

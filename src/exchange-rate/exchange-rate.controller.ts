@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler'
 import { Role } from '../auth/role.enum.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import { Public } from '../common/decorators/public.decorator.js'
+import { PublicCache } from '../common/http/public-cache.js'
 import { Roles } from '../common/decorators/roles.decorator.js'
 import type { AuthUser } from '../common/types/auth-user.js'
 import { ManualRateDto } from './dto/manual-rate.dto.js'
@@ -20,7 +21,7 @@ export class ExchangeRateController {
     constructor(private readonly rates: ExchangeRateService) {}
 
     @Get('current')
-    @Header('Cache-Control', 'no-cache')
+    @PublicCache(60)
     current(): Promise<PublicCurrentRateDto> {
         return this.rates.publicCurrent()
     }

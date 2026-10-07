@@ -13,6 +13,8 @@ import {
     UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
+import { InvalidatesCache } from '../cache/invalidates-cache.decorator.js'
+import { PublicCache } from '../common/http/public-cache.js'
 import { Public } from '../common/decorators/public.decorator.js'
 import { Roles } from '../common/decorators/roles.decorator.js'
 import { Role } from '../auth/role.enum.js'
@@ -22,11 +24,7 @@ import {
     type AdminCategoryDto,
     type CategoryDto,
 } from './categories.service.js'
-import {
-    CATEGORY_IMAGE_FIELD,
-    CATEGORY_IMAGE_UPLOAD_OPTIONS,
-    CategoryImageUploadErrorsFilter,
-} from './category-image-upload.js'
+import { CATEGORY_IMAGE_FIELD, CATEGORY_IMAGE_UPLOAD } from './category-image-upload.js'
 import { CreateCategoryDto } from './dto/create-category.dto.js'
 import { ReorderCategoriesDto } from './dto/reorder-categories.dto.js'
 import { UpdateCategoryDto } from './dto/update-category.dto.js'
@@ -37,6 +35,7 @@ export class CategoriesController {
     constructor(private readonly categories: CategoriesService) {}
 
     @Get()
+    @PublicCache(60)
     list(): Promise<CategoryDto[]> {
         return this.categories.list()
     }
@@ -47,6 +46,7 @@ export class CategoriesController {
  * WEBP or AVIF checked by its bytes, at most 5 MB), stored under `categories/`.
  */
 @Roles(Role.ADMIN, Role.EDITOR)
+@InvalidatesCache('catalog')
 @Controller('admin/categories')
 export class AdminCategoriesController {
     constructor(private readonly categories: CategoriesService) {}
@@ -57,8 +57,8 @@ export class AdminCategoriesController {
     }
 
     @Post()
-    @UseFilters(CategoryImageUploadErrorsFilter)
-    @UseInterceptors(FileInterceptor(CATEGORY_IMAGE_FIELD, CATEGORY_IMAGE_UPLOAD_OPTIONS))
+    @UseFilters(CATEGORY_IMAGE_UPLOAD.filter)
+    @UseInterceptors(FileInterceptor(CATEGORY_IMAGE_FIELD, CATEGORY_IMAGE_UPLOAD.options))
     create(
         @Body() dto: CreateCategoryDto,
         @UploadedFile() image: Express.Multer.File | undefined,
@@ -76,8 +76,8 @@ export class AdminCategoriesController {
     }
 
     @Patch(':slug')
-    @UseFilters(CategoryImageUploadErrorsFilter)
-    @UseInterceptors(FileInterceptor(CATEGORY_IMAGE_FIELD, CATEGORY_IMAGE_UPLOAD_OPTIONS))
+    @UseFilters(CATEGORY_IMAGE_UPLOAD.filter)
+    @UseInterceptors(FileInterceptor(CATEGORY_IMAGE_FIELD, CATEGORY_IMAGE_UPLOAD.options))
     update(
         @Param('slug') slug: string,
         @Body() dto: UpdateCategoryDto,

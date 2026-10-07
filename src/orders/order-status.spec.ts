@@ -6,6 +6,7 @@ import {
     ORDER_STATUSES,
     ORDER_TRANSITIONS,
     type OrderActor,
+    type OrderStatus,
 } from './order-status.js'
 
 const ADMIN: OrderActor = { kind: 'admin', userId: 'u1', role: Role.ADMIN }
@@ -81,8 +82,10 @@ describe('order transition map', () => {
             'ENVIADO',
             'ENTREGADO',
         ] as const
-        for (let index = 0; index < path.length - 1; index += 1) {
-            expect(checkTransition(path[index], path[index + 1], EDITOR).ok).toBe(true)
+        let from: OrderStatus = path[0]
+        for (const to of path.slice(1)) {
+            expect(checkTransition(from, to, EDITOR).ok).toBe(true)
+            from = to
         }
         expect(checkTransition('LISTO_PARA_ENTREGA', 'ENTREGADO', EDITOR).ok).toBe(true)
         expect(checkTransition('PAGO_VERIFICADO', 'ENVIADO', ADMIN)).toEqual({

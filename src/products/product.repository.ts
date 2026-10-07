@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { In, Repository, type FindManyOptions } from 'typeorm'
 import {
     applyConditions,
     applyOrderBy,
@@ -11,6 +11,27 @@ import {
 } from './catalog-query.js'
 import { Product } from './entities/product.entity.js'
 import type { Paginated } from './product.mapper.js'
+
+/**
+ * Brand, variants and images of a product. `relationLoadStrategy: 'query'` loads each relation
+ * with its own query (keyed by the product ids) instead of joining them all at once: one JOIN of
+ * variants × images repeats every product row variants × images times. Relations are ordered in
+ * memory (see `orderRelations`): with this strategy TypeORM still tries to ORDER BY the joined
+ * columns in the main query, which then fails because nothing is joined there.
+ */
+const WITH_RELATIONS = {
+    relations: { brand: true, variants: true, images: true },
+    relationLoadStrategy: 'query',
+} as const satisfies FindManyOptions<Product>
+
+/** Variants by position (then id), images by position (then upload time), as the admin set them. */
+function orderRelations(product: Product): Product {
+    product.variants.sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id))
+    product.images.sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime(),
+    )
+    return product
+}
 
 /**
  * Read helpers shared by the catalog and admin services. Pages are resolved in two steps
@@ -24,23 +45,17 @@ export class ProductRepository {
     /** Loads products with their brand and ordered variants and images, preserving the order of `ids`. */
     async findByIds(ids: string[]): Promise<Product[]> {
         if (!ids.length) return []
-        const rows = await this.products.find({
-            where: { id: In(ids) },
-            relations: { brand: true, variants: true, images: true },
-            order: {
-                variants: { sortOrder: 'ASC', id: 'ASC' },
-                images: { sortOrder: 'ASC', createdAt: 'ASC' },
-            },
-        })
-        const byId = new Map(rows.map((row) => [row.id, row]))
+        const rows = await this.products.find({ where: { id: In(ids) }, ...WITH_RELATIONS })
+        const byId = new Map(rows.map((row) => [row.id, orderRelations(row)]))
         return ids.flatMap((id) => byId.get(id) ?? [])
     }
 
-    async findOneWithRelations(where: { id: string } | { slug: string; isActive: true }) {
-        const row = await this.products.findOne({ where, select: { id: true } })
-        if (!row) return null
-        const [product] = await this.findByIds([row.id])
-        return product ?? null
+    /** One product with its relations, found directly by id or by (active) slug. */
+    async findOneWithRelations(
+        where: { id: string } | { slug: string; isActive: true },
+    ): Promise<Product | null> {
+        const product = await this.products.findOne({ where, ...WITH_RELATIONS })
+        return product && orderRelations(product)
     }
 
     /** Ordered ids matching the conditions, optionally limited. */

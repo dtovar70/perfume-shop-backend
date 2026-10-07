@@ -1,5 +1,4 @@
 import {
-    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -15,9 +14,9 @@ import {
     UseInterceptors,
 } from '@nestjs/common'
 import { FilesInterceptor } from '@nestjs/platform-express'
+import { InvalidatesCache } from '../cache/invalidates-cache.decorator.js'
 import { Roles } from '../common/decorators/roles.decorator.js'
 import { Role } from '../auth/role.enum.js'
-import { ALLOWED_IMAGE_MIME_TYPES } from '../storage/image-type.js'
 import { AdminProductsService } from './admin-products.service.js'
 import { AdminProductQueryDto } from './dto/admin-product-query.dto.js'
 import { CreateProductDto } from './dto/create-product.dto.js'
@@ -26,10 +25,11 @@ import { SetActiveDto } from './dto/set-active.dto.js'
 import { UpdateProductDto } from './dto/update-product.dto.js'
 import { ProductImagesService } from './product-images.service.js'
 import type { AdminProductDto, Paginated } from './product.mapper.js'
-import { MAX_IMAGES_PER_UPLOAD, MAX_IMAGE_SIZE_BYTES } from './products.constants.js'
-import { UploadErrorsFilter } from './upload-errors.filter.js'
+import { MAX_IMAGES_PER_UPLOAD } from './products.constants.js'
+import { PRODUCT_IMAGES_FIELD, PRODUCT_IMAGES_UPLOAD } from './product-images-upload.js'
 
 @Roles(Role.ADMIN, Role.EDITOR)
+@InvalidatesCache('catalog')
 @Controller('admin/products')
 export class AdminProductsController {
     constructor(
@@ -71,21 +71,13 @@ export class AdminProductsController {
     }
 
     @Post(':id/images')
-    @UseFilters(UploadErrorsFilter)
+    @UseFilters(PRODUCT_IMAGES_UPLOAD.filter)
     @UseInterceptors(
-        FilesInterceptor('files', MAX_IMAGES_PER_UPLOAD, {
-            limits: { fileSize: MAX_IMAGE_SIZE_BYTES, files: MAX_IMAGES_PER_UPLOAD },
-            fileFilter: (_req, file, callback) => {
-                if (ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
-                    callback(null, true)
-                } else {
-                    callback(
-                        new BadRequestException('Solo se permiten imágenes JPG, PNG o WEBP.'),
-                        false,
-                    )
-                }
-            },
-        }),
+        FilesInterceptor(
+            PRODUCT_IMAGES_FIELD,
+            MAX_IMAGES_PER_UPLOAD,
+            PRODUCT_IMAGES_UPLOAD.options,
+        ),
     )
     uploadImages(
         @Param('id') id: string,

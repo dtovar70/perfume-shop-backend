@@ -1,14 +1,16 @@
 import { ConflictException, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { SchedulerRegistry } from '@nestjs/schedule'
-import { InjectRepository } from '@nestjs/typeorm'
-import { LessThan, Repository } from 'typeorm'
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
+import { DataSource, LessThan, Repository } from 'typeorm'
 import type { Env } from '../config/env.schema.js'
 import { scheduledJobsEnabled } from '../config/jobs.js'
+import { runExclusive } from '../database/advisory-lock.js'
 import { Order } from './entities/order.entity.js'
 import { OrderStatusService } from './order-status.service.js'
 
 const EXPIRY_INTERVAL_NAME = 'orders-expiry'
+const EXPIRY_LOCK_NAME = 'orders-expiry'
 const BATCH_SIZE = 100
 export const EXPIRY_NOTE = 'Venció el plazo de pago.'
 
@@ -22,6 +24,7 @@ export class OrderExpiryService implements OnApplicationBootstrap {
     private running = false
 
     constructor(
+        @InjectDataSource() private readonly dataSource: DataSource,
         @InjectRepository(Order) private readonly orders: Repository<Order>,
         private readonly statuses: OrderStatusService,
         private readonly config: ConfigService<Env, true>,
@@ -68,11 +71,17 @@ export class OrderExpiryService implements OnApplicationBootstrap {
         return expired
     }
 
+    /**
+     * The scheduled run: skipped while the previous one is still going, or while another API
+     * instance runs it (advisory lock), so two never expire the same orders at once.
+     */
     private async runSafely(): Promise<void> {
         if (this.running) return
         this.running = true
         try {
-            await this.expireOverdue()
+            await runExclusive(this.dataSource, EXPIRY_LOCK_NAME, async () => {
+                await this.expireOverdue()
+            })
         } catch (error) {
             this.logger.error('Order expiry failed', error as Error)
         } finally {

@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { In, Repository } from 'typeorm'
+import { CACHE_KEYS } from '../cache/cache-keys.js'
+import { MemoryCache } from '../cache/memory-cache.js'
 import { slugify } from '../common/utils/text.util.js'
 import { isDbError, omitUndefined } from '../database/db-errors.js'
 import { Product } from '../products/entities/product.entity.js'
@@ -64,10 +66,15 @@ export class BrandsService {
         @InjectRepository(Brand) private readonly brands: Repository<Brand>,
         @InjectRepository(Product) private readonly products: Repository<Product>,
         @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
+        private readonly cache: MemoryCache,
     ) {}
 
     /** Public list: active brands by position, then name, with their visible products. */
-    async list(): Promise<PublicBrandDto[]> {
+    list(): Promise<PublicBrandDto[]> {
+        return this.cache.getOrSet(CACHE_KEYS.brands(), () => this.loadList())
+    }
+
+    private async loadList(): Promise<PublicBrandDto[]> {
         const [brands, counts] = await Promise.all([
             this.brands.find({
                 where: { isActive: true },

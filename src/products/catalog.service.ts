@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { In, Repository } from 'typeorm'
+import { CACHE_KEYS } from '../cache/cache-keys.js'
+import { MemoryCache } from '../cache/memory-cache.js'
 import {
     applyConditions,
     buildCatalogConditions,
@@ -42,6 +44,7 @@ export class CatalogService {
         private readonly products: ProductRepository,
         @InjectRepository(Product) private readonly productRows: Repository<Product>,
         @InjectRepository(ProductVariant) private readonly variantRows: Repository<ProductVariant>,
+        private readonly cache: MemoryCache,
     ) {}
 
     /**
@@ -73,7 +76,11 @@ export class CatalogService {
         return { ...page, items: page.items.map(toPublicProduct) }
     }
 
-    async featured(limit = FEATURED_LIMIT): Promise<PublicProductDto[]> {
+    featured(limit = FEATURED_LIMIT): Promise<PublicProductDto[]> {
+        return this.cache.getOrSet(CACHE_KEYS.featured(limit), () => this.loadFeatured(limit))
+    }
+
+    private async loadFeatured(limit: number): Promise<PublicProductDto[]> {
         const ids = await this.products.findIds([ACTIVE], FEATURED_ORDER_BY, limit)
         return (await this.products.findByIds(ids)).map(toPublicProduct)
     }
@@ -82,7 +89,11 @@ export class CatalogService {
      * Price range and the values (with their product counts) of every catalog filter, over the
      * active products, optionally of one category. Brands are only the active ones.
      */
-    async facets(category?: string): Promise<CatalogFacetsDto> {
+    facets(category?: string): Promise<CatalogFacetsDto> {
+        return this.cache.getOrSet(CACHE_KEYS.facets(category), () => this.loadFacets(category))
+    }
+
+    private async loadFacets(category: string | undefined): Promise<CatalogFacetsDto> {
         const conditions: Condition[] = buildCatalogConditions({ category })
         const base = () =>
             applyConditions(this.productRows.createQueryBuilder(PRODUCT_ALIAS), conditions)

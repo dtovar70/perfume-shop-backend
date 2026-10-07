@@ -7,6 +7,7 @@ import { getDataSourceToken } from '@nestjs/typeorm'
 import cookieParser from 'cookie-parser'
 import request from 'supertest'
 import { AppModule } from '../src/app.module.js'
+import { CacheInvalidator } from '../src/cache/cache-invalidator.js'
 import { createValidationPipe } from '../src/common/pipes/validation.pipe.js'
 import { caracasDay } from '../src/common/utils/caracas-date.js'
 import { DEFAULT_SITE_CONTENT } from '../src/content/content.defaults.js'
@@ -192,6 +193,9 @@ describe('Orders (e2e)', () => {
 
         db.table(SiteContentEntry).push({ key: 'payment', value: PAGO_MOVIL })
         db.table(ExchangeRate)[0]!.effectiveDate = '2020-01-01'
+        // Written behind the API's back: drop what it cached, as an admin write would.
+        app.get(CacheInvalidator).invalidate('content')
+        app.get(CacheInvalidator).invalidate('exchange-rate')
         const stale = await request(app.getHttpServer())
             .post('/api/orders')
             .send(checkout())

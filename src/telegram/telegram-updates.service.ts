@@ -9,7 +9,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm'
 import { InlineKeyboard, type Context } from 'grammy'
 import type { Message } from 'grammy/types'
-import { DataSource } from 'typeorm'
+import { DataSource, In } from 'typeorm'
 import { OrderStatusCatalogService } from '../catalogs/order-status-catalog.service.js'
 import { ORDER_LIMITS } from '../orders/dto/field-names.js'
 import { OrderPayment } from '../orders/entities/order-payment.entity.js'
@@ -244,28 +244,34 @@ export class TelegramUpdatesService implements OnModuleInit {
 
     // Commands
 
+    /**
+     * The oldest payments waiting for review: one count+page query for the orders, one for their
+     * pending payments and a batched load of the details (no per-order queries).
+     */
     private async onPending(ctx: Context, chat: TelegramChat): Promise<void> {
-        const orders = await this.dataSource.getRepository(Order).find({
+        const [orders, total] = await this.dataSource.getRepository(Order).findAndCount({
             where: { status: 'PENDIENTE_VERIFICACION' },
             order: { updatedAt: 'ASC' },
+            take: PENDING_LIST_LIMIT,
         })
-        if (!orders.length) {
+        if (!total) {
             await ctx.reply('🎉 No hay pagos por verificar. ¡Todo al día!')
             return
         }
-        const shown = orders.slice(0, PENDING_LIST_LIMIT)
         await ctx.reply(
-            orders.length > shown.length
-                ? `🧾 Hay ${orders.length} pagos por verificar. Te muestro los ${shown.length} más antiguos:`
-                : `🧾 ${orders.length === 1 ? 'Hay 1 pago' : `Hay ${orders.length} pagos`} por verificar:`,
+            total > orders.length
+                ? `🧾 Hay ${total} pagos por verificar. Te muestro los ${orders.length} más antiguos:`
+                : `🧾 ${total === 1 ? 'Hay 1 pago' : `Hay ${total} pagos`} por verificar:`,
         )
-        for (const order of shown) {
-            const payment = await this.dataSource
-                .getRepository(OrderPayment)
-                .findOne({ where: { orderId: order.id, status: 'PENDIENTE' } })
-            const context = payment ? await this.payments.loadPayment(payment.id) : null
-            if (context)
-                await this.payments.sendPayment(context, [chat.chatId], { withProof: false })
+        const payments = await this.dataSource.getRepository(OrderPayment).find({
+            where: { orderId: In(orders.map((order) => order.id)), status: 'PENDIENTE' },
+            select: { id: true, orderId: true },
+        })
+        const paymentIds = orders.flatMap(
+            (order) => payments.find((payment) => payment.orderId === order.id)?.id ?? [],
+        )
+        for (const context of await this.payments.loadPayments(paymentIds)) {
+            await this.payments.sendPayment(context, [chat.chatId], { withProof: false })
         }
     }
 

@@ -72,9 +72,10 @@ describe('changeStock', () => {
             ['UPDATE "product_variants"', [3, 'asad-100ml']],
             ['UPDATE "products"', ['asad']],
         ])
-        expect(calls[1][0]).toContain('"stock" - $1')
-        expect(calls[1][0]).toContain('"stock" >= $1')
-        expect(calls[2][0]).toContain('SUM(v."stock")')
+        const [, [takeSql] = [''], [syncSql] = ['']] = calls
+        expect(takeSql).toContain('"stock" - $1')
+        expect(takeSql).toContain('"stock" >= $1')
+        expect(syncSql).toContain('SUM(v."stock")')
     })
 
     it('gives units back without a floor check', async () => {

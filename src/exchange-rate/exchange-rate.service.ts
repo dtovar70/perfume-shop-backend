@@ -9,12 +9,16 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { SchedulerRegistry } from '@nestjs/schedule'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
+import { DataSource, Repository } from 'typeorm'
+import { CacheInvalidator } from '../cache/cache-invalidator.js'
+import { CACHE_KEYS } from '../cache/cache-keys.js'
+import { MemoryCache } from '../cache/memory-cache.js'
 import type { AuthUser } from '../common/types/auth-user.js'
 import { addDays, caracasDay, isDateOnly, startOfCaracasDay } from '../common/utils/caracas-date.js'
 import type { Env } from '../config/env.schema.js'
 import { scheduledJobsEnabled } from '../config/jobs.js'
+import { runExclusive } from '../database/advisory-lock.js'
 import { newId } from '../database/id.js'
 import { ExchangeRate } from './entities/exchange-rate.entity.js'
 import {
@@ -36,6 +40,7 @@ const HISTORY_LIMIT = 5
 /** A manual rate may be dated ahead (the BCV publishes the next business day's rate). */
 const MANUAL_MAX_DAYS_AHEAD = 7
 const SYNC_INTERVAL_NAME = 'exchange-rate-sync'
+const SYNC_LOCK_NAME = 'exchange-rate-sync'
 /**
  * Failed syncs in a row before the admins are alerted (once) on Telegram. With the default
  * 120-minute interval, 3 runs are about 6 hours without a new rate.
@@ -139,11 +144,14 @@ export class ExchangeRateService implements OnApplicationBootstrap {
     private failureAlerted = false
 
     constructor(
+        @InjectDataSource() private readonly dataSource: DataSource,
         @InjectRepository(ExchangeRate) private readonly rates: Repository<ExchangeRate>,
         @Inject(EXCHANGE_RATE_PROVIDERS) private readonly providers: ExchangeRateProvider[],
         private readonly config: ConfigService<Env, true>,
         private readonly scheduler: SchedulerRegistry,
         private readonly events: EventEmitter2,
+        private readonly cache: MemoryCache,
+        private readonly invalidator: CacheInvalidator,
     ) {
         this.maxAgeHours = config.get('EXCHANGE_RATE_MAX_AGE_HOURS', { infer: true })
         this.syncIntervalMinutes = config.get('EXCHANGE_RATE_SYNC_INTERVAL_MINUTES', {
@@ -154,18 +162,40 @@ export class ExchangeRateService implements OnApplicationBootstrap {
     onApplicationBootstrap(): void {
         if (!scheduledJobsEnabled(this.config)) return
         // Not awaited: startup must not wait for (or fail because of) a slow BCV website.
-        void this.sync()
-        const interval = setInterval(() => void this.sync(), this.syncIntervalMinutes * 60_000)
+        void this.scheduledSync()
+        const interval = setInterval(
+            () => void this.scheduledSync(),
+            this.syncIntervalMinutes * 60_000,
+        )
         this.scheduler.addInterval(SYNC_INTERVAL_NAME, interval)
     }
 
-    /** Newest stored rate, fresh or not. */
-    async latest(): Promise<ExchangeRate | null> {
-        return this.rates.findOne({
-            where: {},
-            order: { fetchedAt: 'DESC', id: 'DESC' },
-            relations: { createdBy: true },
-        })
+    /**
+     * The cron's run: skipped while another API instance syncs (advisory lock), so a second
+     * instance never fetches and stores the same rate twice. Never throws.
+     */
+    private async scheduledSync(): Promise<void> {
+        try {
+            await runExclusive(this.dataSource, SYNC_LOCK_NAME, async () => {
+                await this.sync()
+            })
+        } catch (error) {
+            this.logger.error(`Scheduled rate sync failed: ${(error as Error).message}`)
+        }
+    }
+
+    /**
+     * Newest stored rate, fresh or not. Cached (the storefront and every checkout ask for it);
+     * freshness is still computed on each read, so a cached row turns stale on time.
+     */
+    latest(): Promise<ExchangeRate | null> {
+        return this.cache.getOrSet(CACHE_KEYS.latestExchangeRate(), () =>
+            this.rates.findOne({
+                where: {},
+                order: { fetchedAt: 'DESC', id: 'DESC' },
+                relations: { createdBy: true },
+            }),
+        )
     }
 
     async current(): Promise<CurrentRateDto | null> {
@@ -263,6 +293,7 @@ export class ExchangeRateService implements OnApplicationBootstrap {
             isManual: true,
             createdById: user.id,
         })
+        this.invalidator.invalidate('exchange-rate')
         this.logger.log(`Manual rate ${rate} (${day}) set by ${user.email}`)
         return this.adminView()
     }
@@ -301,6 +332,7 @@ export class ExchangeRateService implements OnApplicationBootstrap {
                         isManual: false,
                         createdById: null,
                     })
+                    this.invalidator.invalidate('exchange-rate')
                     this.logger.log(
                         `Stored BCV rate ${fetched.rate} (${fetched.effectiveDate}) from ${provider.source}`,
                     )

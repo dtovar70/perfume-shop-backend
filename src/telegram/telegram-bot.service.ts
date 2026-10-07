@@ -29,6 +29,13 @@ export const TELEGRAM_RETRY = {
     unauthorizedMs: 30 * 60_000,
 }
 const STOP_TIMEOUT_MS = 5_000
+/**
+ * Every Bot API call is aborted after this (grammY's default is 500 s), so a stalled Telegram
+ * never holds an approval request or a notification for minutes.
+ */
+const API_TIMEOUT_SECONDS = 15
+/** getUpdates long-poll: must stay under API_TIMEOUT_SECONDS or every poll would be aborted. */
+const LONG_POLL_SECONDS = 10
 
 export interface TelegramBotStatus {
     enabled: boolean
@@ -89,7 +96,10 @@ export class TelegramBotService implements OnApplicationBootstrap, OnApplication
         this.settings = telegramSettings(config)
         this.bot = this.settings.enabled
             ? new Bot(this.settings.token, {
-                  client: this.settings.apiRoot ? { apiRoot: this.settings.apiRoot } : {},
+                  client: {
+                      timeoutSeconds: API_TIMEOUT_SECONDS,
+                      ...(this.settings.apiRoot && { apiRoot: this.settings.apiRoot }),
+                  },
               })
             : null
         this.bot?.catch((error) => {
@@ -200,6 +210,7 @@ export class TelegramBotService implements OnApplicationBootstrap, OnApplication
                 }
                 await bot.start({
                     allowed_updates: [...ALLOWED_UPDATES],
+                    timeout: LONG_POLL_SECONDS,
                     onStart: () => {
                         delay = TELEGRAM_RETRY.firstMs
                         this.markConnected(bot, 'polling started')

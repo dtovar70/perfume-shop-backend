@@ -13,6 +13,7 @@ import { DataSource, In, type EntityManager } from 'typeorm'
 import { OrderStatusCatalogService } from '../catalogs/order-status-catalog.service.js'
 import type { Env } from '../config/env.schema.js'
 import { newId } from '../database/id.js'
+import { OutboxService } from '../outbox/outbox.service.js'
 import {
     changeStock,
     lockStock,
@@ -127,6 +128,7 @@ export class OrderStatusService {
         @InjectDataSource() private readonly dataSource: DataSource,
         private readonly events: EventEmitter2,
         private readonly catalog: OrderStatusCatalogService,
+        private readonly outbox: OutboxService,
         config: ConfigService<Env, true>,
     ) {
         this.paymentWindowMs = config.get('ORDER_PAYMENT_WINDOW_HOURS', { infer: true }) * 3_600_000
@@ -156,6 +158,8 @@ export class OrderStatusService {
             const locked = await this.lockByCode(manager, code)
             if (!locked) throw new NotFoundException(ORDER_NOT_FOUND)
             await this.applyTransition(manager, locked, to, actor, normalized, pending)
+            // Same transaction as the status change (see recordEvents).
+            await this.recordEvents(manager, pending)
             return locked
         })
         this.emit(pending)
@@ -372,7 +376,20 @@ export class OrderStatusService {
         }
     }
 
-    /** Emits events collected during a committed transaction. A failing listener is logged. */
+    /**
+     * Writes the outbox rows (customer emails, Telegram messages) of the events collected in a
+     * transaction, with that transaction: they exist if and only if the change commits. Every
+     * order transaction calls it last, so a notification can never be lost to a crash or a
+     * provider outage after the commit (the worker retries it).
+     */
+    recordEvents(manager: EntityManager, pending: readonly PendingOrderEvent[]): Promise<void> {
+        return this.outbox.enqueue(manager, pending)
+    }
+
+    /**
+     * Emits events collected during a committed transaction, for in-process reactions (cache
+     * invalidation, waking the outbox worker). A failing listener is logged.
+     */
     emit(pending: readonly PendingOrderEvent[]): void {
         for (const event of pending) {
             try {

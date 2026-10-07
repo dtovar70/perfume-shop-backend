@@ -6,9 +6,9 @@ import { ExchangeRateModule } from '../exchange-rate/exchange-rate.module.js'
 import { MailModule } from '../mail/mail.module.js'
 import { AdminOrdersController } from './admin-orders.controller.js'
 import { AdminOrdersService } from './admin-orders.service.js'
-import { OrderEmailsListener } from './emails/order-emails.listener.js'
 import { OrderEmailsService } from './emails/order-emails.service.js'
 import { OrderLookupService } from './emails/order-lookup.service.js'
+import { OrderReceivedEmailHandler } from './emails/order-received.outbox-handler.js'
 import { OrderAccessLink } from './entities/order-access-link.entity.js'
 import { OrderItem } from './entities/order-item.entity.js'
 import { OrderNote } from './entities/order-note.entity.js'
@@ -48,7 +48,7 @@ import { OrderWhatsAppService } from './whatsapp/order-whatsapp.service.js'
         ReceiptService,
         OrderWhatsAppService,
         OrderEmailsService,
-        OrderEmailsListener,
+        OrderReceivedEmailHandler,
         OrderLookupService,
     ],
     // The Telegram bot (Phase 4) calls OrderStatusService.transition() like the admin API, reads

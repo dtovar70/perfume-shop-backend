@@ -32,7 +32,7 @@ import { OrderAccessService, type IssuedAccessLink } from './order-access.servic
 import { ReceiptService } from './receipt/receipt.service.js'
 import { sendReceipt } from './receipt/send-receipt.js'
 import { OrderWhatsAppService, type WhatsAppMessageDto } from './whatsapp/order-whatsapp.service.js'
-import { PROOF_FIELD, PROOF_UPLOAD_OPTIONS, ProofUploadErrorsFilter } from './payment-upload.js'
+import { PROOF_FIELD, PROOF_UPLOAD } from './payment-upload.js'
 
 /**
  * Back office. ADMIN and EDITOR can do everything except cancelling an order, which the
@@ -87,8 +87,8 @@ export class AdminOrdersController {
      */
     @Post(':code/payments')
     @HttpCode(HttpStatus.OK)
-    @UseFilters(ProofUploadErrorsFilter)
-    @UseInterceptors(FileInterceptor(PROOF_FIELD, PROOF_UPLOAD_OPTIONS))
+    @UseFilters(PROOF_UPLOAD.filter)
+    @UseInterceptors(FileInterceptor(PROOF_FIELD, PROOF_UPLOAD.options))
     recordPayment(
         @Param('code') code: string,
         @Body() dto: SubmitPaymentDto,

@@ -105,6 +105,40 @@ npm run start:prod
 Both read `DATABASE_URL` from the environment (or a `.env` file; `dotenv` is a runtime
 dependency). Never run `db:seed` in production: it loads the demo catalog.
 
+### Notifications (outbox)
+
+Customer emails ("Pedido recibido") and the Telegram order notices are written to
+`outbox_messages` in the same transaction as the order change, then delivered by `OutboxWorker`
+(right after the commit, and every 5 s for retries). A failed delivery is retried after 30 s,
+2 min, 10 min, 1 h and then every 6 h; after 8 attempts it stays `failed`. Delivery is
+at-least-once: the handlers skip what an earlier attempt already delivered (Telegram) or, at
+worst, send an email twice. An advisory lock keeps the worker, the BCV sync and the order expiry
+to one instance at a time. ADMIN only:
+
+- `GET /admin/outbox?status&page&pageSize` (`status`: `pending | processing | sent | failed`)
+- `POST /admin/outbox/:id/retry` → schedules a `failed` (or waiting) message now, with fresh attempts
+
+### Docker image
+
+The `Dockerfile` builds a two-stage image: `npm ci` + `npm run build`, then a runtime stage with
+`npm ci --omit=dev` and `dist/` only, running as the unprivileged `node` user with
+`NODE_ENV=production`. It exposes port 3000 (`PORT`) and has a `HEALTHCHECK` on `/api/health`
+(through Node's `fetch`, no curl). No `.env` is copied into the image (see `.dockerignore`): pass
+the variables at run time.
+
+```bash
+docker build -t kaizen-api .
+# Migrations are not run on start: run them as a one-off container before each new version.
+docker run --rm --env-file .env.production kaizen-api npm run migration:run:prod
+docker run --rm --env-file .env.production kaizen-api node dist/cli/create-admin.js \
+    --email duena@tudominio.com --name "Dueña"     # first ADMIN only (password from ADMIN_PASSWORD)
+docker run -d --name kaizen-api --env-file .env.production -p 3000:3000 kaizen-api
+```
+
+The pool and per-connection limits are tunable with `DB_POOL_MAX` (10), `DB_STATEMENT_TIMEOUT_MS`
+(5000), `DB_IDLE_TX_TIMEOUT_MS` (10000) and `DB_CONNECT_TIMEOUT_MS` (3000). They apply to the API
+only: the migration CLI keeps Postgres' defaults, so long index builds are never cut off.
+
 ## Endpoints (prefix `/api`)
 
 Public:
@@ -125,6 +159,14 @@ genders[{ value, count }], families[…], concentrations[…] }` over the active
 - `GET /products/:slug/related?limit` (`limit` 1–12, default 4; same category first, then the rest)
 - `GET /categories` (in `sortOrder` order, with `productCount` of active products)
 - `GET /content` → every site-content section (see [Site content](#site-content))
+
+The public catalog GETs (`/products`, `/products/:slug`, `/products/facets`, `/products/featured`,
+`/categories`, `/brands`, `/content`, `/exchange-rate/current`) answer with
+`Cache-Control: public, max-age=60, stale-while-revalidate=300` (`@PublicCache`), so browsers and a
+CDN may serve them up to a minute old. The API also keeps the category and brand lists, facets and
+featured products (60 s), the site content and the current exchange rate in memory
+(`src/cache`); every admin write, order stock change, content edit and rate change invalidates
+what it affects (`CacheInvalidator`).
 
 Auth (session = httpOnly cookie `kz_session`):
 
@@ -221,9 +263,9 @@ admin edits them at `/admin/contenido`.
 
 Endpoints:
 
-- `GET /content` (public) → `{ general, announcements, … }`. Sent with `Cache-Control: no-cache`
-  and a weak ETag: browsers revalidate on every load (`304` when unchanged), so edits show up at
-  once.
+- `GET /content` (public) → `{ general, announcements, … }`. Sent with
+  `Cache-Control: public, max-age=60, stale-while-revalidate=300` and a weak ETag: edits reach the
+  storefront within about a minute (`304` when revalidated unchanged).
 - `GET /admin/content` (ADMIN, EDITOR) → per section `{ section, value, isDefault, updatedAt,
 updatedBy }` (`no-store`).
 - `PUT /admin/content/:section` (ADMIN, EDITOR) → replaces the whole section (every field must be
@@ -277,7 +319,8 @@ highlight, statuses }], statuses: [{ code, label, customerLabel, customerTitle,
 customerDescription, groupCode, tone, sortOrder, isTerminal }] }`, both sorted.
 - `GET /catalogs/banks` (public) → active banks `[{ code, name }]`, in order.
 - `GET /catalogs/mobile-prefixes` (public) → active codes `[{ code }]`, in order.
-  All three are sent with `Cache-Control: no-cache` and a weak ETag, like `GET /content`.
+  All three are sent with `Cache-Control: no-cache` and a weak ETag (browsers revalidate on
+  every load).
 - ADMIN only, under `/admin/catalogs`: `GET order-statuses` (`no-store`),
   `PATCH order-statuses/:code` `{ label?, customerLabel?, customerTitle?, customerDescription?,
 tone?, whatsappTemplate? }` (only the admin catalog carries `whatsappTemplate`), `PATCH order-statuses/groups/:code` `{ label?, description?, sortOrder? }` (both
@@ -394,11 +437,12 @@ and the ADMIN role, and restores the stock unless the order was already `ENVIADO
 expire after `ORDER_PAYMENT_WINDOW_HOURS` (checked every `ORDER_EXPIRY_INTERVAL_MINUTES`), become
 `EXPIRADO` and restore their stock; the Bs amount is valid for the whole window.
 
-**Events** (`@nestjs/event-emitter`, emitted after commit): `order.created`,
-`order.payment_submitted` (with `late`, `source` and `stockConflict`), `order.status_changed`,
-`order.refund_updated` (payloads in `orders.events.ts`). The Phase 4
-Telegram bot subscribes with `@OnEvent(...)` and approves through `OrderStatusService`
-(exported by `OrdersModule`).
+**Events**: `order.created`, `order.payment_submitted` (with `late`, `source` and
+`stockConflict`), `order.status_changed`, `order.refund_updated` (payloads in `orders.events.ts`).
+Notifications (the "Pedido recibido" email, the Telegram bot's messages) are outbox handlers of
+these events, recorded in the order's transaction (see [Notifications](#notifications-outbox));
+the events are also emitted after commit (`@nestjs/event-emitter`) for in-process reactions such
+as cache invalidation. The bot approves through `OrderStatusService` (exported by `OrdersModule`).
 
 ### BCV exchange rate
 

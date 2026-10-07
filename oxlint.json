@@ -3,7 +3,7 @@
   "ignorePatterns": ["dist/**", "uploads/**", "private-uploads/**"],
   "rules": {
     "@typescript-eslint/no-explicit-any": "off",
-    "@typescript-eslint/no-floating-promises": "warn"
+    "@typescript-eslint/no-floating-promises": "error"
   },
   "env": {
     "node": true

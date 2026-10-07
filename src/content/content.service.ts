@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import { CACHE_KEYS } from '../cache/cache-keys.js'
+import { MemoryCache } from '../cache/memory-cache.js'
 import { BanksService } from '../catalogs/banks.service.js'
 import { MobilePrefixesService } from '../catalogs/mobile-prefixes.service.js'
 import { createValidationPipe } from '../common/pipes/validation.pipe.js'
@@ -129,10 +131,18 @@ export class ContentService {
         private readonly banks: BanksService,
         private readonly mobilePrefixes: MobilePrefixesService,
         @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
+        private readonly cache: MemoryCache,
     ) {}
 
-    /** Every section, stored values merged over the defaults. */
-    async getAll(): Promise<SiteContent> {
+    /**
+     * Every section, stored values merged over the defaults. Cached: every page, checkout and
+     * email reads it; the admin routes invalidate it (`@InvalidatesCache('content')`).
+     */
+    getAll(): Promise<SiteContent> {
+        return this.cache.getOrSet(CACHE_KEYS.content(), () => this.loadAll())
+    }
+
+    private async loadAll(): Promise<SiteContent> {
         const rows = await this.entries.find()
         const stored = new Map(rows.map((row) => [row.key, row.value]))
         return Object.fromEntries(

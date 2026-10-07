@@ -4,7 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { GrammyError, InlineKeyboard, InputFile } from 'grammy'
 import type { Message } from 'grammy/types'
 import type { Readable } from 'node:stream'
-import { DataSource } from 'typeorm'
+import { DataSource, In } from 'typeorm'
 import { User } from '../auth/entities/user.entity.js'
 import { OrderStatusCatalogService } from '../catalogs/order-status-catalog.service.js'
 import type { Env } from '../config/env.schema.js'
@@ -12,6 +12,7 @@ import { AdminOrdersService } from '../orders/admin-orders.service.js'
 import { OrderPayment } from '../orders/entities/order-payment.entity.js'
 import { Order } from '../orders/entities/order.entity.js'
 import { OrderWhatsAppService } from '../orders/whatsapp/order-whatsapp.service.js'
+import type { TelegramChat } from './entities/telegram-chat.entity.js'
 import type { TelegramMessage } from './entities/telegram-message.entity.js'
 import { encodeCallback } from './telegram-callbacks.js'
 import { TelegramBotService } from './telegram-bot.service.js'
@@ -140,14 +141,53 @@ export class TelegramPaymentsService {
     }
 
     async loadPayment(paymentId: string): Promise<PaymentContext | null> {
-        const payment = await this.dataSource
+        const [context] = await this.loadPayments([paymentId])
+        return context ?? null
+    }
+
+    /**
+     * Several payments with their orders (and items) in a fixed number of queries, whatever
+     * their count; returned in the order of `paymentIds`, skipping the ones not found.
+     */
+    async loadPayments(paymentIds: readonly string[]): Promise<PaymentContext[]> {
+        if (!paymentIds.length) return []
+        const payments = await this.dataSource
             .getRepository(OrderPayment)
-            .findOne({ where: { id: paymentId } })
-        if (!payment) return null
-        const order = await this.dataSource
-            .getRepository(Order)
-            .findOne({ where: { id: payment.orderId }, relations: { items: true } })
-        if (!order) return null
+            .find({ where: { id: In([...paymentIds]) } })
+        const orders = payments.length
+            ? await this.dataSource.getRepository(Order).find({
+                  where: { id: In(payments.map((payment) => payment.orderId)) },
+                  relations: { items: true },
+              })
+            : []
+        const recorderIds = payments.flatMap((payment) =>
+            payment.source === 'admin' && payment.recordedById ? [payment.recordedById] : [],
+        )
+        const recorders = recorderIds.length
+            ? await this.dataSource
+                  .getRepository(User)
+                  .find({ where: { id: In(recorderIds) }, select: { id: true, name: true } })
+            : []
+
+        const paymentById = new Map(payments.map((payment) => [payment.id, payment]))
+        const orderById = new Map(orders.map((order) => [order.id, order]))
+        const nameById = new Map(recorders.map((user) => [user.id, user.name]))
+        return paymentIds.flatMap((id) => {
+            const payment = paymentById.get(id)
+            const order = payment && orderById.get(payment.orderId)
+            if (!payment || !order) return []
+            const recordedByName = payment.recordedById
+                ? (nameById.get(payment.recordedById) ?? null)
+                : null
+            return [this.toContext(order, payment, recordedByName)]
+        })
+    }
+
+    private toContext(
+        order: Order,
+        payment: OrderPayment,
+        recordedByName: string | null,
+    ): PaymentContext {
         const items = [...(order.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
         return {
             order,
@@ -174,10 +214,7 @@ export class TelegramPaymentsService {
                     duplicateReference: payment.duplicateReference,
                     late: payment.late,
                     source: payment.source,
-                    recordedByName:
-                        payment.source === 'admin'
-                            ? await this.userName(payment.recordedById)
-                            : null,
+                    recordedByName: payment.source === 'admin' ? recordedByName : null,
                     hasProof: payment.hasProof,
                 },
                 adminUrl: this.adminUrl(order.code),
@@ -374,28 +411,42 @@ export class TelegramPaymentsService {
         return delivered
     }
 
-    /** `order.payment_submitted`: every active linked chat gets the payment. */
-    async notifyPaymentSubmitted(paymentId: string): Promise<void> {
-        if (!this.telegram.enabled) return
-        const chats = await this.store.activeChats()
-        if (!chats.length) return
+    /**
+     * `order.payment_submitted`: every active linked chat gets the payment. Chats that already
+     * hold a copy are skipped, so a repeated delivery (outbox retry) only completes the missing
+     * ones. Resolves how many active chats still lack it (0 when done or nothing to send).
+     */
+    async notifyPaymentSubmitted(paymentId: string): Promise<number> {
+        if (!this.telegram.enabled) return 0
+        const missing = () => this.chatsWithout(this.store.paymentMessages(paymentId))
+        const targets = await missing()
+        if (!targets.length) return 0
         const context = await this.loadPayment(paymentId)
         // Already handled in the meantime (or gone): nothing to ask.
-        if (!context?.pending) return
-        const chatIds = chats.map((chat) => chat.chatId)
-        await this.sendPayment(context, chatIds, { withProof: true })
+        if (!context?.pending) return 0
+        await this.sendPayment(
+            context,
+            targets.map((chat) => chat.chatId),
+            { withProof: true },
+        )
+        return (await missing()).length
     }
 
-    /** `order.created`: a short notice to the chats that asked for new orders. */
-    async notifyOrderCreated(orderId: string): Promise<void> {
+    /**
+     * `order.created`: a short notice to the chats that asked for new orders, skipping those
+     * that already got it. Resolves how many of them still lack it.
+     */
+    async notifyOrderCreated(orderId: string): Promise<number> {
         const api = this.telegram.api
-        if (!api) return
-        const chats = await this.store.activeChats({ newOrders: true })
-        if (!chats.length) return
+        if (!api) return 0
+        const missing = () =>
+            this.chatsWithout(this.store.newOrderMessages(orderId), { newOrders: true })
+        const chats = await missing()
+        if (!chats.length) return 0
         const order = await this.dataSource
             .getRepository(Order)
             .findOne({ where: { id: orderId }, relations: { items: true } })
-        if (!order) return
+        if (!order) return 0
         const items = [...(order.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
         const url = this.adminUrl(order.code)
         let text = newOrderMessage({
@@ -431,6 +482,20 @@ export class TelegramPaymentsService {
             }
         }
         await this.store.recordMessages(records)
+        return (await missing()).length
+    }
+
+    /**
+     * Active chats with no message among `copies`. Chats found unreachable while sending were
+     * deactivated, so they no longer count as missing.
+     */
+    private async chatsWithout(
+        copies: Promise<TelegramMessage[]>,
+        filter: { newOrders?: boolean } = {},
+    ): Promise<TelegramChat[]> {
+        const [chats, sent] = await Promise.all([this.store.activeChats(filter), copies])
+        const reached = new Set(sent.map((message) => String(message.chatId)))
+        return chats.filter((chat) => !reached.has(String(chat.chatId)))
     }
 
     /**

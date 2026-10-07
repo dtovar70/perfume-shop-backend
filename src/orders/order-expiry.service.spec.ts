@@ -1,7 +1,7 @@
 import { ConflictException } from '@nestjs/common'
 import type { ConfigService } from '@nestjs/config'
 import type { SchedulerRegistry } from '@nestjs/schedule'
-import type { Repository } from 'typeorm'
+import type { DataSource, Repository } from 'typeorm'
 import type { Env } from '../config/env.schema.js'
 import type { Order } from './entities/order.entity.js'
 import { EXPIRY_NOTE, OrderExpiryService } from './order-expiry.service.js'
@@ -12,6 +12,7 @@ function setup(overdue: Pick<Order, 'id' | 'code'>[]) {
     const transition = vi.fn().mockResolvedValue({})
     const addInterval = vi.fn()
     const service = new OrderExpiryService(
+        {} as DataSource,
         { find } as unknown as Repository<Order>,
         { transition } as unknown as OrderStatusService,
         {

@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
+import { CacheModule } from '../src/cache/cache.module.js'
 import { createValidationPipe } from '../src/common/pipes/validation.pipe.js'
 import { AdminProductsController } from '../src/products/admin-products.controller.js'
 import { AdminProductsService } from '../src/products/admin-products.service.js'
@@ -34,6 +35,7 @@ describe('Admin products limits (e2e)', () => {
     beforeEach(async () => {
         vi.clearAllMocks()
         const moduleFixture = await Test.createTestingModule({
+            imports: [CacheModule],
             controllers: [AdminProductsController],
             providers: [
                 { provide: AdminProductsService, useValue: products },

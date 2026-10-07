@@ -14,9 +14,11 @@ import {
 } from '@nestjs/common'
 import { FileFieldsInterceptor } from '@nestjs/platform-express'
 import { Role } from '../auth/role.enum.js'
+import { InvalidatesCache } from '../cache/invalidates-cache.decorator.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import { Public } from '../common/decorators/public.decorator.js'
 import { Roles } from '../common/decorators/roles.decorator.js'
+import { PublicCache } from '../common/http/public-cache.js'
 import type { AuthUser } from '../common/types/auth-user.js'
 import {
     ContentService,
@@ -25,15 +27,12 @@ import {
     type HeroMediaUploadDto,
 } from './content.service.js'
 import type { SiteContent } from './content.types.js'
-import {
-    HERO_MEDIA_FIELDS,
-    HERO_MEDIA_UPLOAD_OPTIONS,
-    HeroMediaUploadErrorsFilter,
-} from './hero-media-upload.js'
+import { HERO_MEDIA_FIELDS, HERO_MEDIA_UPLOAD } from './hero-media-upload.js'
 
 /**
- * Public site content. `no-cache` lets browsers keep a copy but revalidate it on every load;
- * Express adds a weak ETag, so an unchanged payload costs a 304. Edits show up immediately.
+ * Public site content, the same for every visitor: browsers and CDNs may keep it a minute (and
+ * serve it stale while refreshing), so an edit reaches the storefront within about a minute.
+ * Express adds a weak ETag, so a revalidated, unchanged payload costs a 304.
  */
 @Public()
 @Controller('content')
@@ -41,13 +40,14 @@ export class ContentController {
     constructor(private readonly content: ContentService) {}
 
     @Get()
-    @Header('Cache-Control', 'no-cache')
+    @PublicCache(60)
     getAll(): Promise<SiteContent> {
         return this.content.getAll()
     }
 }
 
 @Roles(Role.ADMIN, Role.EDITOR)
+@InvalidatesCache('content')
 @Controller('admin/content')
 export class AdminContentController {
     constructor(private readonly content: ContentService) {}
@@ -64,8 +64,8 @@ export class AdminContentController {
      * previous upload. Declared before `:section` routes for readability; paths do not overlap.
      */
     @Post('hero-media')
-    @UseFilters(HeroMediaUploadErrorsFilter)
-    @UseInterceptors(FileFieldsInterceptor(HERO_MEDIA_FIELDS, HERO_MEDIA_UPLOAD_OPTIONS))
+    @UseFilters(HERO_MEDIA_UPLOAD.filter)
+    @UseInterceptors(FileFieldsInterceptor(HERO_MEDIA_FIELDS, HERO_MEDIA_UPLOAD.options))
     uploadHeroMedia(
         @UploadedFiles()
         files: { file?: Express.Multer.File[]; poster?: Express.Multer.File[] } | undefined,

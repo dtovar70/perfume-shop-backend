@@ -28,15 +28,18 @@ export class OrderEmailsService {
         return this.mail.delivers
     }
 
-    /** "Pedido recibido" to the order's email. Resolves false when nothing was sent. */
-    async sendOrderReceived(orderId: string): Promise<boolean> {
-        if (!this.enabled) return false
+    /**
+     * "Pedido recibido" to the order's email. `skipped` when there is nothing to send (mail off,
+     * order gone), `failed` when the provider did not accept it (worth retrying).
+     */
+    async sendOrderReceived(orderId: string): Promise<'sent' | 'skipped' | 'failed'> {
+        if (!this.enabled) return 'skipped'
         const order = await this.dataSource
             .getRepository(Order)
             .findOne({ where: { id: orderId }, relations: { items: true } })
         if (!order) {
             this.logger.warn(`Order ${orderId} not found; no "order received" email`)
-            return false
+            return 'skipped'
         }
         const content = await this.content.getAll()
         const link = await this.access.issue(order.id, order.code, null)
@@ -46,7 +49,11 @@ export class OrderEmailsService {
             link.url,
             { brandName: content.general.brandName, contact: content.contact },
         )
-        return this.mail.send({ to: order.customerEmail, ...email }, `order received ${order.code}`)
+        const sent = await this.mail.send(
+            { to: order.customerEmail, ...email },
+            `order received ${order.code}`,
+        )
+        return sent ? 'sent' : 'failed'
     }
 
     /** "Consultar mi pedido": a fresh link to the order's own email. */

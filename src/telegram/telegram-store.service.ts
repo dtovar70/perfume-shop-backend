@@ -198,6 +198,11 @@ export class TelegramStoreService {
         })
     }
 
+    /** The "Nuevo pedido" notices of an order, in every chat. */
+    newOrderMessages(orderId: string): Promise<TelegramMessage[]> {
+        return this.messages.find({ where: { orderId, kind: 'new_order' } })
+    }
+
     /** Every payment detail message of an order. */
     orderPaymentMessages(orderId: string): Promise<TelegramMessage[]> {
         return this.messages.find({

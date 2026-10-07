@@ -5,12 +5,14 @@ import { Category } from '../../src/categories/entities/category.entity.js'
 import { caracasDay } from '../../src/common/utils/caracas-date.js'
 import { SiteContentEntry } from '../../src/content/entities/site-content.entity.js'
 import { ExchangeRate } from '../../src/exchange-rate/entities/exchange-rate.entity.js'
+import { REFERENCE_DIGITS } from '../../src/orders/dto/field-names.js'
 import { OrderAccessLink } from '../../src/orders/entities/order-access-link.entity.js'
 import { OrderItem } from '../../src/orders/entities/order-item.entity.js'
 import { OrderNote } from '../../src/orders/entities/order-note.entity.js'
 import { OrderPayment } from '../../src/orders/entities/order-payment.entity.js'
 import { OrderStatusHistory } from '../../src/orders/entities/order-status-history.entity.js'
 import { Order } from '../../src/orders/entities/order.entity.js'
+import { OutboxMessage } from '../../src/outbox/entities/outbox-message.entity.js'
 import { ProductImage } from '../../src/products/entities/product-image.entity.js'
 import { ProductVariant } from '../../src/products/entities/product-variant.entity.js'
 import { Product } from '../../src/products/entities/product.entity.js'
@@ -72,6 +74,7 @@ export class FakeDb {
         [OrderAccessLink, []],
         [ExchangeRate, []],
         [SiteContentEntry, []],
+        [OutboxMessage, []],
     ])
 
     constructor() {
@@ -326,13 +329,15 @@ export class FakeDb {
     }
 
     private update(entity: unknown, where: Row, changes: Row) {
-        for (const row of this.table(entity).filter((candidate) => matches(candidate, where))) {
+        const hit = this.table(entity).filter((candidate) => matches(candidate, where))
+        for (const row of hit) {
             Object.assign(row, changes, entity === Order ? { updatedAt: new Date() } : {})
         }
-        return Promise.resolve({})
+        return Promise.resolve({ affected: hit.length })
     }
 
     private rawQuery(sql: string, params: unknown[] = []): Promise<unknown> {
+        if (sql.includes('"outbox_messages"')) return Promise.resolve(this.outboxQuery(sql, params))
         if (sql.includes('nextval')) return Promise.resolve([{ seq: ++this.seq }])
         if (sql.includes('SUM(v."stock")')) {
             this.syncProductStock(params[0] as string)
@@ -348,17 +353,12 @@ export class FakeDb {
             return Promise.resolve([])
         }
         if (sql.includes('FROM "order_payments" p')) {
-            const [reference, orderId, closed, digits] = params as [
-                string,
-                string,
-                string[],
-                number,
-            ]
+            const [reference, orderId, closed] = params as [string, string, string[]]
             return Promise.resolve(
                 this.table(OrderPayment).filter((payment) => {
                     const order = this.table(Order).find((row) => row.id === payment.orderId)
                     return (
-                        (payment.reference as string).slice(-digits) === reference &&
+                        (payment.reference as string).slice(-REFERENCE_DIGITS) === reference &&
                         payment.orderId !== orderId &&
                         !closed.includes(order?.status as string)
                     )
@@ -366,6 +366,74 @@ export class FakeDb {
             )
         }
         throw new Error(`Unexpected SQL: ${sql}`)
+    }
+
+    /**
+     * The OutboxStore statements (claim, sent, failed, release), answered like TypeORM does for
+     * an UPDATE … RETURNING: `[rows, count]`. Time is the real clock, like `now()`.
+     */
+    private outboxQuery(sql: string, params: unknown[]): [Row[], number] {
+        const rows = this.table(OutboxMessage)
+        const now = new Date()
+        const byId = (id: unknown) =>
+            rows.filter((row) => row.id === id && row.status === 'processing')
+        if (sql.includes(`SET "status" = 'processing'`)) {
+            const [limit, leaseMs] = params as [number, number]
+            const due = rows
+                .filter((row) => row.status === 'pending' && (row.nextAttemptAt as Date) <= now)
+                .sort(
+                    (a, b) =>
+                        (a.nextAttemptAt as Date).getTime() - (b.nextAttemptAt as Date).getTime(),
+                )
+                .slice(0, limit)
+            for (const row of due) {
+                Object.assign(row, {
+                    status: 'processing',
+                    attempts: (row.attempts as number) + 1,
+                    nextAttemptAt: new Date(now.getTime() + leaseMs),
+                })
+            }
+            const claimed = due.map(({ id, type, payload, attempts }) => ({
+                id,
+                type,
+                payload,
+                attempts,
+            }))
+            return [claimed, claimed.length]
+        }
+        if (sql.includes(`SET "status" = 'sent'`)) {
+            const hit = byId(params[0])
+            for (const row of hit)
+                Object.assign(row, { status: 'sent', sentAt: now, lastError: null })
+            return [[], hit.length]
+        }
+        if (sql.includes('"last_error" = $4')) {
+            const [id, status, retryAt, error] = params as [string, string, Date | null, string]
+            const hit = byId(id)
+            for (const row of hit) {
+                Object.assign(row, {
+                    status,
+                    lastError: error,
+                    nextAttemptAt: retryAt ?? row.nextAttemptAt,
+                })
+            }
+            return [[], hit.length]
+        }
+        if (sql.includes(`"status" = 'processing' AND "next_attempt_at" < now()`)) {
+            const [maxAttempts] = params as [number]
+            const stuck = rows.filter(
+                (row) => row.status === 'processing' && (row.nextAttemptAt as Date) < now,
+            )
+            for (const row of stuck) {
+                Object.assign(row, {
+                    status: (row.attempts as number) >= maxAttempts ? 'failed' : 'pending',
+                    lastError: row.lastError ?? 'Interrumpido durante el envío.',
+                    nextAttemptAt: now,
+                })
+            }
+            return [stuck.map(({ id }) => ({ id })), stuck.length]
+        }
+        throw new Error(`Unexpected outbox SQL: ${sql}`)
     }
 
     readonly manager = {
@@ -402,8 +470,18 @@ export class FakeDb {
         }
         return {
             ...this.manager,
-            find: (options: { where?: Row; take?: number } = {}) =>
-                Promise.resolve(this.table(entity).filter((row) => matches(row, options.where))),
+            find: (options: { where?: Row; take?: number } = {}) => {
+                const rows = this.table(entity).filter((row) => matches(row, options.where))
+                return Promise.resolve(
+                    entity === Order ? rows.map((row) => this.withRelations(row)) : rows,
+                )
+            },
+            findAndCount: (options: { where?: Row; skip?: number; take?: number } = {}) => {
+                const rows = this.table(entity).filter((row) => matches(row, options.where))
+                const start = options.skip ?? 0
+                const end = options.take === undefined ? undefined : start + options.take
+                return Promise.resolve([rows.slice(start, end), rows.length])
+            },
             findOne: (options: { where?: Row }) => {
                 const found = this.table(entity).find((row) => matches(row, options.where))
                 if (!found) return Promise.resolve(null)
@@ -431,9 +509,17 @@ export class FakeDb {
         entityMetadatas: [],
         options: { type: 'postgres' },
         manager: this.manager,
+        query: (sql: string, params?: unknown[]) => this.rawQuery(sql, params),
         getRepository: (entity: unknown) => this.repository(entity),
         transaction: <T>(work: (manager: FakeDb['manager']) => Promise<T>): Promise<T> =>
             this.isolatedTransactions ? this.isolated(work) : work(this.manager),
+        /** The dedicated connection of `runExclusive`: the advisory lock is always free here. */
+        createQueryRunner: () => ({
+            connect: () => Promise.resolve(),
+            query: (sql: string) =>
+                Promise.resolve(sql.includes('pg_try_advisory_lock') ? [{ locked: true }] : []),
+            release: () => Promise.resolve(),
+        }),
     }
 
     private isolated<T>(work: (manager: FakeDb['manager']) => Promise<T>): Promise<T> {

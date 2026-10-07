@@ -366,6 +366,8 @@ export class AdminOrdersService {
                     updatedAt: now.toISOString(),
                 },
             })
+            // No handler delivers refund events today; recorded like every order change.
+            await this.statuses.recordEvents(manager, pending)
         })
         this.statuses.emit(pending)
         return this.get(code, user)

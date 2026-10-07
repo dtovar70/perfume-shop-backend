@@ -10,6 +10,8 @@ import { caracasDay } from '../src/common/utils/caracas-date.js'
 import { OrderPayment } from '../src/orders/entities/order-payment.entity.js'
 import { OrderStatusHistory } from '../src/orders/entities/order-status-history.entity.js'
 import { Order } from '../src/orders/entities/order.entity.js'
+import { OutboxMessage } from '../src/outbox/entities/outbox-message.entity.js'
+import { OutboxWorker } from '../src/outbox/outbox.worker.js'
 import { STORAGE_SERVICE, type StorageService } from '../src/storage/storage.service.js'
 import { TelegramChat } from '../src/telegram/entities/telegram-chat.entity.js'
 import { TelegramMessage } from '../src/telegram/entities/telegram-message.entity.js'
@@ -603,6 +605,42 @@ describe('Telegram bot (e2e, fake Bot API)', () => {
         const notice = telegramServer.of('sendMessage')[0]
         expect(String(notice?.chat_id)).toBe(String(OWNER))
         expect(notice?.text).toContain(`Nuevo pedido</b> · <b>${order.code}`)
+    })
+
+    it('retries a notice Telegram failed to take, without repeating it to any chat', async () => {
+        const owner = await link(OWNER)
+        await http()
+            .patch(`/api/admin/telegram/chats/${owner?.id as string}`)
+            .set('Cookie', cookie('admin'))
+            .send({ notifyNewOrders: true })
+            .expect(200)
+        telegramServer.reset()
+        telegramServer.overrides.set('sendMessage', () => ({
+            ok: false,
+            error_code: 500,
+            description: 'Internal Server Error',
+        }))
+
+        await placeOrder()
+        const row = () =>
+            db.table(OutboxMessage).find((message) => message.type === 'telegram.order_created')
+        await eventually(() => expect(row()).toMatchObject({ status: 'pending', attempts: 1 }))
+        const notice = row() as Row
+        expect(notice.lastError).toContain('1 Telegram chat(s) not reached')
+
+        telegramServer.overrides.clear()
+        const worker = app.get(OutboxWorker)
+        notice.nextAttemptAt = new Date(0)
+        await worker.wake()
+        expect(notice).toMatchObject({ status: 'sent', attempts: 2 })
+        // The failed call and the successful one.
+        expect(telegramServer.of('sendMessage')).toHaveLength(2)
+
+        // Delivered again (at-least-once, e.g. after a crash): the chat already has it.
+        Object.assign(notice, { status: 'pending', nextAttemptAt: new Date(0) })
+        await worker.wake()
+        expect(notice.status).toBe('sent')
+        expect(telegramServer.of('sendMessage')).toHaveLength(2)
     })
 
     it('sends a test message and unlinks from the admin', async () => {

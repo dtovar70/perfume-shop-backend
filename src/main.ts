@@ -8,6 +8,7 @@ import { AppModule } from './app.module.js'
 import { createValidationPipe } from './common/pipes/validation.pipe.js'
 import { corsOptions } from './config/cors.js'
 import type { Env } from './config/env.schema.js'
+import { API_PREFIX, GLOBAL_PREFIX_OPTIONS } from './config/global-prefix.js'
 import { applyTrustProxy, resolveTrustProxy } from './config/trust-proxy.js'
 import { LOCAL_UPLOADS_DIR } from './storage/local-storage.service.js'
 
@@ -23,7 +24,8 @@ async function bootstrap(): Promise<void> {
             TRUST_PROXY: config.get('TRUST_PROXY', { infer: true }),
         }),
     )
-    app.setGlobalPrefix('api')
+    // `/sitemap.xml` stays at the root (see GLOBAL_PREFIX_OPTIONS).
+    app.setGlobalPrefix(API_PREFIX, GLOBAL_PREFIX_OPTIONS)
     // Images are loaded cross-origin by the storefront, so relax CORP for static files.
     app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
     app.use(cookieParser())

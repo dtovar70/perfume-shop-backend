@@ -78,11 +78,11 @@ export class MergeGenderCategories1792100000000 implements MigrationInterface {
     name = 'MergeGenderCategories1792100000000'
 
     async up(queryRunner: QueryRunner): Promise<void> {
-        const [{ count }] = (await queryRunner.query(
+        const [row] = (await queryRunner.query(
             `SELECT count(*)::int AS "count" FROM "products" WHERE "category_slug" = ANY ($1)`,
             [GENDER_SLUGS],
         )) as { count: number }[]
-        if (count > 0) {
+        if ((row?.count ?? 0) > 0) {
             for (const category of TYPE_CATEGORIES) {
                 await queryRunner.query(
                     `INSERT INTO "categories" ("slug", "name", "tagline", "description", "color_hex", "sort_order")

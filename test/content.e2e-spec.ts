@@ -112,7 +112,9 @@ describe('Site content (e2e)', () => {
     it('GET /api/content is public, returns the defaults and is revalidated with an ETag', async () => {
         const response = await request(app.getHttpServer()).get('/api/content').expect(200)
         expect(response.body).toEqual(DEFAULT_SITE_CONTENT)
-        expect(response.headers['cache-control']).toBe('no-cache')
+        expect(response.headers['cache-control']).toBe(
+            'public, max-age=60, stale-while-revalidate=300',
+        )
         expect(response.headers.etag).toBeDefined()
 
         await request(app.getHttpServer())
@@ -191,6 +193,27 @@ describe('Site content (e2e)', () => {
         })
         expect(params[2]).toBe(USERS.editor.id)
         expect(response.body.section).toBe('home')
+    })
+
+    it('serves the public content from the cache until an admin edit invalidates it', async () => {
+        const server = app.getHttpServer()
+        await request(server).get('/api/content').expect(200)
+        await request(server).get('/api/content').expect(200)
+        expect(contentRepository.find).toHaveBeenCalledOnce()
+
+        const heroTitle = 'Nuevo título'
+        contentRepository.find.mockResolvedValueOnce([
+            { key: 'home', value: { ...DEFAULT_SITE_CONTENT.home, heroTitle } },
+        ])
+        await request(server)
+            .put('/api/admin/content/home')
+            .set('Cookie', cookie('editor'))
+            .send({ ...DEFAULT_SITE_CONTENT.home, heroTitle })
+            .expect(200)
+
+        const { body } = await request(server).get('/api/content').expect(200)
+        expect(body.home.heroTitle).toBe(heroTitle)
+        expect(contentRepository.find).toHaveBeenCalledTimes(2)
     })
 
     it('only ADMIN can restore the defaults', async () => {
