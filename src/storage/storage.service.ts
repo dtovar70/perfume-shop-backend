@@ -20,8 +20,8 @@ export interface StoredFile {
 export const PUBLIC_FOLDERS = ['products', 'brands'] as const
 export type PublicFolder = (typeof PUBLIC_FOLDERS)[number]
 
-/** Folders of public page media (images or videos), e.g. the home hero. */
-export const MEDIA_FOLDERS = ['hero'] as const
+/** Folders of public page media (images or videos): the home hero and the category covers. */
+export const MEDIA_FOLDERS = ['hero', 'categories'] as const
 export type MediaFolder = (typeof MEDIA_FOLDERS)[number]
 
 export interface UploadableMedia {

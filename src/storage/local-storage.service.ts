@@ -28,8 +28,8 @@ export const LOCAL_UPLOADS_DIR = join(process.cwd(), 'uploads')
 export const LOCAL_PRIVATE_UPLOADS_DIR = join(process.cwd(), 'private-uploads')
 
 const SAFE_PUBLIC_ID = /^(products|brands)\/[a-f0-9-]{36}\.(jpg|png|webp)$/
-/** Keys of page media this service creates (`hero/<uuid>.<ext>`). */
-const SAFE_MEDIA_ID = /^(hero)\/[a-f0-9-]{36}\.(jpg|png|webp|avif|mp4|webm)$/
+/** Keys of page media this service creates (`hero/<uuid>.<ext>`, `categories/<uuid>.<ext>`). */
+const SAFE_MEDIA_ID = /^(hero|categories)\/[a-f0-9-]{36}\.(jpg|png|webp|avif|mp4|webm)$/
 /** Keys this service creates for private files; anything else is refused (path traversal). */
 const SAFE_PRIVATE_KEY = /^(payment-proofs)\/[a-f0-9-]{36}\.(jpg|png|webp)$/
 

@@ -67,4 +67,16 @@ describe('LocalStorageService media URLs', () => {
         ).toBeNull()
         expect(storage.mediaFromUrl(`https://cdn.example.com/hero/${id}.mp4`, 'hero')).toBeNull()
     })
+
+    it('keeps category covers in their own folder', () => {
+        expect(
+            storage.mediaFromUrl(
+                `http://localhost:3000/uploads/categories/${id}.avif`,
+                'categories',
+            ),
+        ).toEqual({ publicId: `categories/${id}.avif`, kind: 'image' })
+        expect(
+            storage.mediaFromUrl(`http://localhost:3000/uploads/hero/${id}.jpg`, 'categories'),
+        ).toBeNull()
+    })
 })

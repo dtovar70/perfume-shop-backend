@@ -31,6 +31,14 @@ export class Category {
     @Column({ name: 'sort_order', type: 'integer', default: 0 })
     sortOrder: number
 
+    /** Cover of the category's card: an uploaded file or an external https URL. */
+    @Column({ name: 'image_url', type: 'text', nullable: true })
+    imageUrl: string | null
+
+    /** Storage key of an uploaded cover, to delete it later (never exposed); null for a URL. */
+    @Column({ name: 'image_public_id', type: 'text', nullable: true })
+    imagePublicId: string | null
+
     @OneToMany(() => Product, (product) => product.category)
     products: Relation<Product[]>
 }

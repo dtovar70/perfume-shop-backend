@@ -1,7 +1,9 @@
 import {
     BadRequestException,
     ConflictException,
+    Inject,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -9,6 +11,13 @@ import { Repository } from 'typeorm'
 import { slugify } from '../common/utils/text.util.js'
 import { isDbError, omitUndefined } from '../database/db-errors.js'
 import { Product } from '../products/entities/product.entity.js'
+import { detectMediaType, mediaKind } from '../storage/media-type.js'
+import {
+    STORAGE_SERVICE,
+    type StorageService,
+    type StoredFile,
+} from '../storage/storage.service.js'
+import { INVALID_CATEGORY_IMAGE_TYPE } from './category-image-upload.js'
 import type { CreateCategoryDto } from './dto/create-category.dto.js'
 import { CATEGORY_SLUG_MAX_LENGTH } from './dto/field-names.js'
 import type { UpdateCategoryDto } from './dto/update-category.dto.js'
@@ -32,6 +41,13 @@ export interface CategoryDto {
     tagline: string
     description: string
     colorHex: string
+    /** Cover uploaded (or linked) from the admin; null when there is none. */
+    imageUrl: string | null
+    /**
+     * Fallback for the card when there is no cover: the first photo of the category's best
+     * active product (featured first, then by relevance). Null when no product has a photo.
+     */
+    previewImageUrl: string | null
     /** Number of active products in the category. */
     productCount: number
 }
@@ -50,6 +66,29 @@ interface ProductCounts {
 
 const NO_PRODUCTS: ProductCounts = { active: 0, total: 0 }
 
+/**
+ * For each category (or only `$1`), the first photo of its best active product: featured first,
+ * then by relevance, newest, id. One query: `DISTINCT ON` keeps the top product per category and
+ * the lateral join picks its first image (products without photos never qualify).
+ */
+const PREVIEW_IMAGES_SQL = (oneCategory: boolean) => `
+    SELECT DISTINCT ON (p."category_slug") p."category_slug" AS "slug", img."url" AS "url"
+    FROM "products" p
+    CROSS JOIN LATERAL (
+        SELECT i."url"
+        FROM "product_images" i
+        WHERE i."product_id" = p."id"
+        ORDER BY i."sort_order" ASC, i."created_at" ASC
+        LIMIT 1
+    ) img
+    WHERE p."is_active"${oneCategory ? ' AND p."category_slug" = $1' : ''}
+    ORDER BY p."category_slug", p."is_featured" DESC, p."relevance_score" DESC,
+        p."created_at" DESC, p."id" ASC
+`
+
+/** The cover columns a create or update writes. */
+type ImageChange = Pick<Category, 'imageUrl' | 'imagePublicId'>
+
 /** "tiene 1 producto. Muévelo…" / "tiene 6 productos. Muévelos…" */
 export function categoryInUseMessage(count: number): string {
     return count === 1
@@ -63,24 +102,40 @@ function slugTakenMessage(slug: string): string {
 
 @Injectable()
 export class CategoriesService {
+    private readonly logger = new Logger(CategoriesService.name)
+
     constructor(
         @InjectRepository(Category) private readonly categories: Repository<Category>,
         @InjectRepository(Product) private readonly products: Repository<Product>,
+        @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     ) {}
 
-    /** Public list, in menu order, with the count of visible products. */
+    /** Public list, in menu order, with the count of visible products and the card images. */
     async list(): Promise<CategoryDto[]> {
-        const [categories, counts] = await Promise.all([this.findOrdered(), this.productCounts()])
-        return categories.map((category) => toDto(category, counts.get(category.slug)))
+        const [categories, counts, previews] = await Promise.all([
+            this.findOrdered(),
+            this.productCounts(),
+            this.previewImages(),
+        ])
+        return categories.map((category) =>
+            toDto(category, counts.get(category.slug), previews.get(category.slug)),
+        )
     }
 
     /** Admin list: same order, plus the position and the count of every product. */
     async listForAdmin(): Promise<AdminCategoryDto[]> {
-        const [categories, counts] = await Promise.all([this.findOrdered(), this.productCounts()])
-        return categories.map((category) => toAdminDto(category, counts.get(category.slug)))
+        const [categories, counts, previews] = await Promise.all([
+            this.findOrdered(),
+            this.productCounts(),
+            this.previewImages(),
+        ])
+        return categories.map((category) =>
+            toAdminDto(category, counts.get(category.slug), previews.get(category.slug)),
+        )
     }
 
-    async create(dto: CreateCategoryDto): Promise<AdminCategoryDto> {
+    /** `image`: an uploaded cover (multipart), stored under `categories/`; wins over `imageUrl`. */
+    async create(dto: CreateCategoryDto, image?: Express.Multer.File): Promise<AdminCategoryDto> {
         const slug = dto.slug ?? slugify(dto.name).slice(0, CATEGORY_SLUG_MAX_LENGTH)
         if (!slug) {
             throw new BadRequestException(
@@ -94,35 +149,69 @@ export class CategoriesService {
             throw new ConflictException(slugTakenMessage(slug))
         }
 
+        const sortOrder = dto.sortOrder ?? (await this.nextSortOrder())
+        const stored = image ? await this.storeImage(image) : null
         const category: CategoryRow = {
             slug,
             name: dto.name,
             tagline: dto.tagline ?? '',
             description: dto.description ?? '',
             colorHex: dto.colorHex,
-            sortOrder: dto.sortOrder ?? (await this.nextSortOrder()),
+            sortOrder,
+            imageUrl: stored?.url ?? (dto.removeImage ? null : (dto.imageUrl ?? null)),
+            imagePublicId: stored?.publicId ?? null,
         }
         try {
             await this.categories.insert(category)
         } catch (error) {
+            if (stored) await this.deleteImage(stored.publicId)
             // Two requests with the same slug can both pass the check above.
             if (isDbError(error, '23505')) throw new ConflictException(slugTakenMessage(slug))
             throw error
         }
-        return toAdminDto(category, NO_PRODUCTS)
+        // A new category has no products yet, hence no counts and no preview.
+        return toAdminDto(category, NO_PRODUCTS, null)
     }
 
-    async update(slug: string, dto: UpdateCategoryDto): Promise<AdminCategoryDto> {
+    /**
+     * Partial update. A new `image` file replaces the cover; `removeImage: true`, `imageUrl: null`
+     * (or blank) removes it and an `imageUrl` replaces it. A replaced uploaded file is deleted
+     * from storage afterwards.
+     */
+    async update(
+        slug: string,
+        dto: UpdateCategoryDto,
+        image?: Express.Multer.File,
+    ): Promise<AdminCategoryDto> {
         const category = await this.categories.findOneBy({ slug })
         if (!category) throw new NotFoundException(CATEGORY_NOT_FOUND)
 
-        const changes = omitUndefined({ ...dto })
-        if (Object.keys(changes).length) {
-            await this.categories.update({ slug }, changes)
+        const stored = image ? await this.storeImage(image) : null
+        const { imageUrl, removeImage, ...fields } = dto
+        let imageChange: ImageChange | null = null
+        if (stored) imageChange = { imageUrl: stored.url, imagePublicId: stored.publicId }
+        else if (removeImage) imageChange = { imageUrl: null, imagePublicId: null }
+        else if (imageUrl !== undefined && imageUrl !== category.imageUrl) {
+            imageChange = { imageUrl, imagePublicId: null }
         }
+
+        const changes: Partial<CategoryRow> = { ...omitUndefined({ ...fields }), ...imageChange }
+        if (Object.keys(changes).length) {
+            try {
+                await this.categories.update({ slug }, changes)
+            } catch (error) {
+                if (stored) await this.deleteImage(stored.publicId)
+                throw error
+            }
+        }
+        if (imageChange && category.imagePublicId) await this.deleteImage(category.imagePublicId)
+
         const updated = { ...category, ...changes }
-        const counts = await this.productCounts(slug)
-        return toAdminDto(updated, counts.get(slug))
+        const [counts, previews] = await Promise.all([
+            this.productCounts(slug),
+            this.previewImages(slug),
+        ])
+        return toAdminDto(updated, counts.get(slug), previews.get(slug))
     }
 
     /**
@@ -151,9 +240,11 @@ export class CategoriesService {
      * `ON DELETE RESTRICT` as a safety net; this check exists to give a helpful message.
      */
     async remove(slug: string): Promise<void> {
-        if (!(await this.categories.existsBy({ slug }))) {
-            throw new NotFoundException(CATEGORY_NOT_FOUND)
-        }
+        const category = await this.categories.findOne({
+            where: { slug },
+            select: { slug: true, imagePublicId: true },
+        })
+        if (!category) throw new NotFoundException(CATEGORY_NOT_FOUND)
         await this.assertEmpty(slug)
 
         try {
@@ -164,6 +255,37 @@ export class CategoriesService {
             if (isDbError(error, '23503')) await this.assertEmpty(slug)
             throw error
         }
+        if (category.imagePublicId) await this.deleteImage(category.imagePublicId)
+    }
+
+    /** Checks the real file type (JPG, PNG, WEBP or AVIF) before storing the cover. */
+    private async storeImage(file: Express.Multer.File): Promise<StoredFile> {
+        const type = detectMediaType(file.buffer)
+        if (!type || mediaKind(type) !== 'image') {
+            throw new BadRequestException(INVALID_CATEGORY_IMAGE_TYPE)
+        }
+        try {
+            return await this.storage.uploadMedia({ buffer: file.buffer, type }, 'categories')
+        } catch (error) {
+            this.logger.error('Category image upload failed', error as Error)
+            throw new BadRequestException('No pudimos guardar la imagen. Intenta de nuevo.')
+        }
+    }
+
+    /** A failure only leaves an orphan file. */
+    private async deleteImage(publicId: string): Promise<void> {
+        await this.storage.deleteMedia({ publicId, kind: 'image' }).catch((error: unknown) => {
+            this.logger.warn(`Could not delete category image "${publicId}": ${String(error)}`)
+        })
+    }
+
+    /** Preview photo per category slug (optionally for a single category); see the SQL. */
+    private async previewImages(slug?: string): Promise<Map<string, string>> {
+        const rows: { slug: string; url: string }[] = await this.products.query(
+            PREVIEW_IMAGES_SQL(slug !== undefined),
+            slug !== undefined ? [slug] : [],
+        )
+        return new Map(rows.map((row) => [row.slug, row.url]))
     }
 
     private async assertEmpty(slug: string): Promise<void> {
@@ -204,20 +326,31 @@ export class CategoriesService {
     }
 }
 
-function toDto(category: CategoryRow, counts: ProductCounts = NO_PRODUCTS): CategoryDto {
+/** `imagePublicId` is internal and never leaves the API. */
+function toDto(
+    category: CategoryRow,
+    counts: ProductCounts = NO_PRODUCTS,
+    previewImageUrl: string | null = null,
+): CategoryDto {
     return {
         slug: category.slug,
         name: category.name,
         tagline: category.tagline,
         description: category.description,
         colorHex: category.colorHex,
+        imageUrl: category.imageUrl,
+        previewImageUrl,
         productCount: counts.active,
     }
 }
 
-function toAdminDto(category: CategoryRow, counts: ProductCounts = NO_PRODUCTS): AdminCategoryDto {
+function toAdminDto(
+    category: CategoryRow,
+    counts: ProductCounts = NO_PRODUCTS,
+    previewImageUrl: string | null = null,
+): AdminCategoryDto {
     return {
-        ...toDto(category, counts),
+        ...toDto(category, counts, previewImageUrl),
         sortOrder: category.sortOrder,
         totalProductCount: counts.total,
     }
