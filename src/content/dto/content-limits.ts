@@ -19,7 +19,8 @@ export const CONTENT_LIMITS = {
     tagline: 80,
     titleSuffix: 70,
     metaDescription: 300,
-    announcement: 80,
+    /** Short one-line copy (shipping texts). */
+    shortCopy: 80,
     searchPlaceholder: 60,
     statValue: 12,
     email: 100,
@@ -37,7 +38,6 @@ export const CONTENT_LIMITS = {
 } as const
 
 export const CONTENT_LIST_SIZES = {
-    announcements: { minItems: 1, maxItems: 8 },
     heroFeatures: { minItems: 0, maxItems: 4 },
     steps: { minItems: 1, maxItems: 6 },
     paragraphs: { minItems: 1, maxItems: 6 },

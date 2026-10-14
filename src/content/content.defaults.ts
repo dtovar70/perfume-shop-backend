@@ -19,13 +19,6 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
             'Perfumes originales árabes, de nicho y de diseñador en Venezuela. Precios en dólares, pago móvil en bolívares a tasa BCV y envío gratis desde {envioGratis}.',
         searchPlaceholder: 'Buscar perfumes, marcas, notas…',
     },
-    announcements: {
-        messages: [
-            'Envío gratis desde {envioGratis}',
-            'Perfumes 100% originales',
-            'Paga con Pago Móvil a tasa BCV',
-        ],
-    },
     home: {
         heroBadge: '',
         heroTitle: 'Fragancias que *cuentan* quién eres',

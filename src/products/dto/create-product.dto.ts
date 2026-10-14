@@ -40,7 +40,7 @@ import { FIELD } from './field-names.js'
 
 const MAX_PRICE = 99_999_999.99
 /** A typo never overflows the `integer` columns, not even summed over every variant. */
-const MAX_STOCK = 1_000_000
+export const MAX_STOCK = 1_000_000
 
 /** "KZ-0001": letters, digits, dots, dashes and underscores. */
 export const SKU_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
@@ -92,6 +92,19 @@ export class ProductVariantInputDto {
     @Min(0, { message: msg.notNegative(FIELD.variantStock) })
     @Max(MAX_STOCK, { message: msg.max(FIELD.variantStock, MAX_STOCK) })
     stock: number
+
+    /**
+     * Update only: the stock this variant had when the form was loaded. Required to change the
+     * stock of an existing variant; when the database no longer has this count (orders took or
+     * gave back units meanwhile) the update fails with 409 `STOCK_CHANGED`. When `stock` equals
+     * it, the admin did not touch the stock and the current count is kept. Ignored for new
+     * variants and on create.
+     */
+    @IsOptional()
+    @IsInt({ message: msg.integer(FIELD.variantExpectedStock) })
+    @Min(0, { message: msg.notNegative(FIELD.variantExpectedStock) })
+    @Max(MAX_STOCK, { message: msg.max(FIELD.variantExpectedStock, MAX_STOCK) })
+    expectedStock?: number
 }
 
 export class CreateProductDto {

@@ -22,7 +22,7 @@ import { ProductImage } from './entities/product-image.entity.js'
 import { ProductVariant } from './entities/product-variant.entity.js'
 import { Product } from './entities/product.entity.js'
 import { computeDerivedFields } from './product-derived.js'
-import { syncProductStock } from './product-stock.js'
+import { lockStock, syncProductStock } from './product-stock.js'
 import { ProductRepository } from './product.repository.js'
 import { toAdminProduct, type AdminProductDto, type Paginated } from './product.mapper.js'
 import { PRODUCT_NOT_FOUND } from './products.constants.js'
@@ -51,6 +51,35 @@ function variantRows(
             sortOrder: index,
         }
     })
+}
+
+/** 409 of an update whose stock changed since the form was loaded (orders took or gave back units). */
+export const STOCK_CHANGED = 'STOCK_CHANGED'
+
+/** A stock count the admin edited, checked against the one the form was loaded with. */
+interface StockEdit {
+    /** Path of the edited field, e.g. `variants.0.stock` or `stock`. */
+    field: string
+    /** Count in the database (locked). */
+    current: number
+    /** What the admin typed. */
+    stock: number
+    /** What the form was loaded with; undefined when the client did not send it. */
+    expected: number | undefined
+}
+
+/**
+ * The count to store for one stock field the admin may have edited, or why it cannot be stored.
+ * A value equal to the loaded one means "not touched": the database count is kept, so editing
+ * only the name or the price never fights with the orders taking units meanwhile.
+ */
+function resolveStockEdit(edit: StockEdit): number | 'missing' | 'changed' {
+    if (edit.expected === undefined) {
+        // An old client: writing the same count is harmless, anything else could overwrite.
+        return edit.stock === edit.current ? edit.current : 'missing'
+    }
+    if (edit.stock === edit.expected) return edit.current
+    return edit.current === edit.expected ? edit.stock : 'changed'
 }
 
 /** With variants, the product's stock is their sum; otherwise the given count. */
@@ -183,10 +212,27 @@ export class AdminProductsService {
             dto.compareAtPrice === undefined ? current.compareAtPrice : dto.compareAtPrice
         this.assertCompareAtPrice(price, compareAtPrice)
 
-        const { variants, ...fields } = dto
+        const { variants, expectedStock, ...fields } = dto
         try {
             // Replacing variants and updating the product must succeed or fail together.
             await this.dataSource.transaction(async (manager) => {
+                // Same lock order as the orders (the product, then its variants by id): the
+                // counts compared below cannot move until this transaction ends.
+                const locked = await lockStock(manager, [id])
+                const product = locked.products.get(id)
+                if (!product) throw new NotFoundException(PRODUCT_NOT_FOUND)
+                const currentVariants = locked.variants.get(id) ?? []
+                const rows = variants
+                    ? variantRows(id, variants, new Set(currentVariants.map((v) => v.id)))
+                    : undefined
+                this.applyStockEdits(
+                    product,
+                    currentVariants,
+                    variants && rows ? { inputs: variants, rows } : undefined,
+                    fields,
+                    expectedStock,
+                )
+
                 await manager.update(
                     Product,
                     { id },
@@ -195,7 +241,7 @@ export class AdminProductsService {
                         ...computeDerivedFields(merged),
                     },
                 )
-                if (variants) await this.replaceVariants(manager, id, variants)
+                if (rows) await this.replaceVariants(manager, currentVariants, rows)
                 // Also after a plain `stock` edit: with variants it is always their sum.
                 await syncProductStock(manager, [id])
             })
@@ -242,19 +288,93 @@ export class AdminProductsService {
     }
 
     /**
+     * Checks every stock count the admin edited against the one the form was loaded with, on
+     * rows `lockStock` holds, and keeps the database count where the admin did not edit it
+     * (rewrites `rows[].stock` and `fields.stock` in place). 409 `STOCK_CHANGED` with the
+     * current counts when orders moved an edited one; 400 when an edit lacks its loaded count.
+     */
+    private applyStockEdits(
+        product: Product,
+        currentVariants: readonly ProductVariant[],
+        variants:
+            { inputs: ProductVariantInputDto[]; rows: { id: string; stock: number }[] } | undefined,
+        fields: { stock?: number },
+        expectedStock: number | undefined,
+    ): void {
+        const currentById = new Map(currentVariants.map((variant) => [variant.id, variant.stock]))
+        const missing: string[] = []
+        let changed = false
+        const resolve = (edit: StockEdit): number => {
+            const result = resolveStockEdit(edit)
+            if (result === 'missing') missing.push(edit.field.replace(/stock$/, 'expectedStock'))
+            else if (result === 'changed') changed = true
+            return typeof result === 'number' ? result : edit.current
+        }
+
+        variants?.rows.forEach((row, index) => {
+            const current = currentById.get(row.id)
+            const input = variants.inputs[index]
+            // New variants have no loaded count: theirs is simply written.
+            if (current === undefined || !input) return
+            row.stock = resolve({
+                field: `variants.${index}.stock`,
+                current,
+                stock: input.stock,
+                expected: input.expectedStock,
+            })
+        })
+
+        if (fields.stock !== undefined) {
+            const endsWithVariants = variants
+                ? variants.rows.length > 0
+                : currentVariants.length > 0
+            if (endsWithVariants) {
+                // With variants the product's stock is their sum (`syncProductStock`).
+                delete fields.stock
+            } else {
+                fields.stock = resolve({
+                    field: 'stock',
+                    current: product.stock,
+                    stock: fields.stock,
+                    expected: expectedStock,
+                })
+            }
+        }
+
+        if (changed) {
+            throw new ConflictException({
+                statusCode: 409,
+                error: 'Conflict',
+                code: STOCK_CHANGED,
+                message:
+                    'El stock cambió mientras editabas (entraron pedidos). Recarga para ver el valor actual.',
+                stock: product.stock,
+                variants: currentVariants.map(({ id, label, stock }) => ({ id, label, stock })),
+            })
+        }
+        if (missing.length) {
+            throw new BadRequestException({
+                statusCode: 400,
+                error: 'Bad Request',
+                message:
+                    'Para cambiar el stock recarga el producto: falta el stock que tenía al abrir el formulario.',
+                details: missing.map((field) => ({
+                    field,
+                    errors: ['Falta el stock que tenía al abrir el formulario.'],
+                })),
+            })
+        }
+    }
+
+    /**
      * Replaces the variant list (order = array order), keeping the ids of the variants that
-     * stay. The product row is already locked by the update, as `lockStock` expects.
+     * stay. `current` are this product's variants, locked by `lockStock` with the product.
      */
     private async replaceVariants(
         manager: EntityManager,
-        productId: string,
-        variants: ProductVariantInputDto[],
+        current: readonly ProductVariant[],
+        rows: ReturnType<typeof variantRows>,
     ): Promise<void> {
-        const current = await manager.find(ProductVariant, {
-            where: { productId },
-            select: { id: true },
-        })
-        const rows = variantRows(productId, variants, new Set(current.map(({ id }) => id)))
         const kept = new Set(rows.map(({ id }) => id))
         const removed = current.map(({ id }) => id).filter((id) => !kept.has(id))
         if (removed.length) await manager.delete(ProductVariant, { id: In(removed) })

@@ -129,17 +129,30 @@ describe('mergeSection', () => {
 
 describe('ContentService', () => {
     it('getAll merges the stored sections over the defaults', async () => {
-        const { service } = setup([{ key: 'announcements', value: { messages: ['Solo hoy'] } }])
+        const { service } = setup([{ key: 'about', value: { paragraphs: ['Solo hoy'] } }])
         const content = await service.getAll()
         expect(Object.keys(content)).toEqual([...CONTENT_SECTIONS])
-        expect(content.announcements.messages).toEqual(['Solo hoy'])
+        expect(content.about.paragraphs).toEqual(['Solo hoy'])
         expect(content.home).toEqual(DEFAULT_SITE_CONTENT.home)
+    })
+
+    it('ignores a stored row of a removed section (announcements)', async () => {
+        const { service } = setup([
+            { key: 'announcements' as never, value: { messages: ['Solo hoy'] } },
+        ])
+        const content = await service.getAll()
+        expect(Object.keys(content)).toEqual([...CONTENT_SECTIONS])
+        expect(content).not.toHaveProperty('announcements')
     })
 
     it('rejects unknown sections with 404', async () => {
         const { service } = setup()
         await expect(service.update('banner', {}, USER)).rejects.toThrow(NotFoundException)
         await expect(service.reset('banner')).rejects.toThrow(NotFoundException)
+        await expect(service.update('announcements', { messages: ['Hola'] }, USER)).rejects.toThrow(
+            NotFoundException,
+        )
+        await expect(service.reset('announcements')).rejects.toThrow(NotFoundException)
     })
 
     it('every default section except Pago Móvil (empty until filled) passes its own DTO', async () => {
@@ -330,20 +343,22 @@ describe('ContentService', () => {
 
     it('checks list sizes and names the offending item', async () => {
         const { service } = setup()
-        expect(await detailsOf(service.update('announcements', { messages: [] }, USER))).toEqual([
+        const about = (paragraphs: string[]) => ({ ...DEFAULT_SITE_CONTENT.about, paragraphs })
+        expect(await detailsOf(service.update('about', about([]), USER))).toEqual([
             {
-                field: 'messages',
-                errors: ['La lista de anuncios debe tener al menos 1 elemento.'],
+                field: 'paragraphs',
+                errors: ['La lista de párrafos debe tener al menos 1 elemento.'],
             },
         ])
-        expect(
-            await detailsOf(
-                service.update('announcements', { messages: ['Hola', '   ', 'x'] }, USER),
-            ),
-        ).toEqual([{ field: 'messages', errors: ['El anuncio 2 es obligatorio.'] }])
-        const nine = Array.from({ length: 9 }, (_, index) => `Anuncio ${index}`)
-        expect(await detailsOf(service.update('announcements', { messages: nine }, USER))).toEqual([
-            { field: 'messages', errors: ['La lista de anuncios admite como máximo 8 elementos.'] },
+        expect(await detailsOf(service.update('about', about(['Hola', '   ', 'x']), USER))).toEqual(
+            [{ field: 'paragraphs', errors: ['El párrafo 2 es obligatorio.'] }],
+        )
+        const seven = Array.from({ length: 7 }, (_, index) => `Párrafo ${index}`)
+        expect(await detailsOf(service.update('about', about(seven), USER))).toEqual([
+            {
+                field: 'paragraphs',
+                errors: ['La lista de párrafos admite como máximo 6 elementos.'],
+            },
         ])
     })
 
@@ -436,14 +451,16 @@ describe('ContentService', () => {
         const { service } = setup()
         expect(
             await detailsOf(
-                service.update('announcements', { messages: ['Gratis desde {envio}'] }, USER),
+                service.update(
+                    'about',
+                    { ...DEFAULT_SITE_CONTENT.about, paragraphs: ['Gratis desde {envio}'] },
+                    USER,
+                ),
             ),
         ).toEqual([
             {
-                field: 'messages',
-                errors: [
-                    'El anuncio 1 usa {envio}, que no existe. Puedes usar {envioGratis}, {tarifaEnvio}.',
-                ],
+                field: 'paragraphs',
+                errors: ['El párrafo 1 usa {envio}, que no existe. Puedes usar {marca}, {ciudad}.'],
             },
         ])
 

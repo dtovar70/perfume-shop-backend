@@ -112,6 +112,7 @@ describe('Site content (e2e)', () => {
     it('GET /api/content is public, returns the defaults and is revalidated with an ETag', async () => {
         const response = await request(app.getHttpServer()).get('/api/content').expect(200)
         expect(response.body).toEqual(DEFAULT_SITE_CONTENT)
+        expect(response.body).not.toHaveProperty('announcements')
         expect(response.headers['cache-control']).toBe(
             'public, max-age=60, stale-while-revalidate=300',
         )
@@ -153,6 +154,21 @@ describe('Site content (e2e)', () => {
             .send({})
             .expect(404)
         expect(response.body.message).toBe('No existe la sección de contenido «banner».')
+    })
+
+    it('the removed announcements section is an unknown section (404)', async () => {
+        const put = await request(app.getHttpServer())
+            .put('/api/admin/content/announcements')
+            .set('Cookie', cookie('admin'))
+            .send({ messages: ['Envío gratis'] })
+            .expect(404)
+        expect(put.body.message).toBe('No existe la sección de contenido «announcements».')
+        await request(app.getHttpServer())
+            .post('/api/admin/content/announcements/reset')
+            .set('Cookie', cookie('admin'))
+            .expect(404)
+        expect(contentRepository.query).not.toHaveBeenCalled()
+        expect(contentRepository.delete).not.toHaveBeenCalled()
     })
 
     it('PUT with invalid data is a 400 with Spanish details per field', async () => {

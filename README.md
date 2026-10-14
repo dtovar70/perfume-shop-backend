@@ -245,16 +245,15 @@ The storefront's texts and business data live in `site_content`, one row per sec
 PK, `value` jsonb, `updated_at` timestamptz, `updated_by` → `users.id`, `ON DELETE SET NULL`). The
 admin edits them at `/admin/contenido`.
 
-| Section         | What it holds                                                                                                                                                                                                     |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `general`       | Brand name, tagline, footer description, page-title suffix, meta description, search placeholder                                                                                                                  |
-| `announcements` | Ticker messages (1–8, ordered)                                                                                                                                                                                    |
-| `home`          | Hero (badge, headline, subtitle, buttons, check features), section headings and copy, steps, CTA banner, newsletter                                                                                               |
-| `about`         | Badge, title, paragraphs, button, values (icon/title/description), stats                                                                                                                                          |
-| `contact`       | Email, phone and WhatsApp (`0412-5550134`), city, schedule, Instagram/TikTok handles                                                                                                                              |
-| `contactPage`   | Contact page header and FAQ                                                                                                                                                                                       |
-| `shipping`      | Free-shipping threshold and flat rate (USD), free-shipping and production copy                                                                                                                                    |
-| `payment`       | Pago Móvil: bank code + name, phone, cédula/RIF, holder, instructions. Shown on the customer's order page; while any field but the instructions is empty, `POST /orders` answers `503 PAYMENT_METHOD_UNAVAILABLE` |
+| Section       | What it holds                                                                                                                                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `general`     | Brand name, tagline, footer description, page-title suffix, meta description, search placeholder                                                                                                                  |
+| `home`        | Hero (badge, headline, subtitle, buttons, check features), section headings and copy, steps, CTA banner, newsletter                                                                                               |
+| `about`       | Badge, title, paragraphs, button, values (icon/title/description), stats                                                                                                                                          |
+| `contact`     | Email, phone and WhatsApp (`0412-5550134`), city, schedule, Instagram/TikTok handles                                                                                                                              |
+| `contactPage` | Contact page header and FAQ                                                                                                                                                                                       |
+| `shipping`    | Free-shipping threshold and flat rate (USD), free-shipping and production copy                                                                                                                                    |
+| `payment`     | Pago Móvil: bank code + name, phone, cédula/RIF, holder, instructions. Shown on the customer's order page; while any field but the instructions is empty, `POST /orders` answers `503 PAYMENT_METHOD_UNAVAILABLE` |
 
 - **Defaults live in code** (`src/content/content.defaults.ts`): exactly the texts the storefront
   shipped with. No rows are seeded; `GET` merges the stored value of each section over its
@@ -269,12 +268,12 @@ admin edits them at `/admin/contenido`.
   (`0412-5550134` on an active code, `V-12345678` / `J-123456789`, bank code `0102`, handles without `@`), money
   `>= 0` with 2 decimals, known placeholders and paired asterisks. Errors use the usual Spanish
   `{ message, details: [{ field, errors }] }` body; list items of plain-text lists are reported on
-  the list with their position (`El anuncio 2 es obligatorio.`), nested ones by path
+  the list with their position (`El párrafo 2 es obligatorio.`), nested ones by path
   (`steps.1.title`).
 
 Endpoints:
 
-- `GET /content` (public) → `{ general, announcements, … }`. Sent with
+- `GET /content` (public) → `{ general, home, … }`. Sent with
   `Cache-Control: public, max-age=60, stale-while-revalidate=300` and a weak ETag: edits reach the
   storefront within about a minute (`304` when revalidated unchanged).
 - `GET /admin/content` (ADMIN, EDITOR) → per section `{ section, value, isDefault, updatedAt,

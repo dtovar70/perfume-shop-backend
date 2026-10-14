@@ -135,7 +135,7 @@ const envObject = z.object({
     CLOUDINARY_API_KEY: optionalString,
     CLOUDINARY_API_SECRET: optionalString,
     /** Hours a new order waits for its payment before it expires (fractions allowed). */
-    ORDER_PAYMENT_WINDOW_HOURS: z.coerce.number().positive().max(720).default(24),
+    ORDER_PAYMENT_WINDOW_HOURS: z.coerce.number().positive().max(720).default(2),
     /** How often unpaid orders past their deadline are expired. */
     ORDER_EXPIRY_INTERVAL_MINUTES: z.coerce.number().positive().max(1440).default(10),
     /**

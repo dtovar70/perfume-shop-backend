@@ -39,7 +39,7 @@ describe('envSchema', () => {
 describe('envSchema (orders and exchange rate)', () => {
     it('defaults the payment window, expiry, rate age and sync interval', () => {
         const env = validateEnv(BASE)
-        expect(env.ORDER_PAYMENT_WINDOW_HOURS).toBe(24)
+        expect(env.ORDER_PAYMENT_WINDOW_HOURS).toBe(2)
         expect(env.ORDER_EXPIRY_INTERVAL_MINUTES).toBe(10)
         expect(env.EXCHANGE_RATE_MAX_AGE_HOURS).toBe(24)
         expect(env.EXCHANGE_RATE_SYNC_INTERVAL_MINUTES).toBe(120)
