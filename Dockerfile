@@ -29,4 +29,4 @@ EXPOSE 3000
 # No curl in the slim image: Node's own fetch probes the API (which also pings the database).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD ["node", "-e", "fetch(`http://127.0.0.1:${process.env.PORT}/api/health`).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "node node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js && exec node dist/main.js"]
