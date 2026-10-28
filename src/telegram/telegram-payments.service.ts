@@ -201,6 +201,7 @@ export class TelegramPaymentsService {
                 totalUsd: order.totalUsd,
                 totalBs: order.totalBs,
                 exchangeRate: order.exchangeRate,
+                exchangeRateCurrency: order.exchangeRateCurrency ?? 'USD',
                 stockConflict: order.stockConflict,
                 payment: {
                     reference: payment.reference,

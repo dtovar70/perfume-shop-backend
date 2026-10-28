@@ -1140,6 +1140,90 @@ describe('Orders (e2e)', () => {
         expect(DEFAULT_SITE_CONTENT.payment.bankCode).toBe('')
     })
 
+    it('prices orders with the rate the admin picked and freezes it on the order', async () => {
+        db.table(ExchangeRate).push({
+            id: 'rate-eur',
+            currency: 'EUR',
+            rate: 974.063,
+            source: 'bcv',
+            effectiveDate: caracasDay(),
+            fetchedAt: new Date(),
+            isManual: false,
+            createdById: null,
+            createdBy: null,
+        })
+        const setCurrency = (currency: string, user: 'admin' | 'editor' = 'admin') =>
+            request(app.getHttpServer())
+                .put('/api/admin/exchange-rate/active-currency')
+                .set('Cookie', cookie(user))
+                .send({ currency })
+
+        await setCurrency('EUR', 'editor').expect(403)
+        const invalid = await setCurrency('GBP').expect(400)
+        expect(invalid.body.details).toEqual([
+            { field: 'currency', errors: ['La moneda no es válida. Usa USD, EUR, USDT.'] },
+        ])
+        const switched = await setCurrency('EUR').expect(200)
+        expect(switched.body).toMatchObject({
+            activeCurrency: 'EUR',
+            current: { currency: 'EUR', rate: 974.063 },
+        })
+
+        const current = await request(app.getHttpServer())
+            .get('/api/exchange-rate/current')
+            .expect(200)
+        expect(current.body).toMatchObject({ available: true, currency: 'EUR', rate: 974.063 })
+
+        // Prices stay in dollars: $36 x 974,063 Bs/€.
+        const euroOrder = await request(app.getHttpServer())
+            .post('/api/orders')
+            .send(checkout())
+            .expect(201)
+        expect(euroOrder.body.order.totals).toMatchObject({
+            totalUsd: 36,
+            exchangeRate: 974.063,
+            exchangeRateCurrency: 'EUR',
+            totalBs: 35066.27,
+        })
+        expect(db.table(Order)[0]).toMatchObject({
+            exchangeRateCurrency: 'EUR',
+            exchangeRateId: 'rate-eur',
+        })
+
+        // Switching back only affects new orders.
+        await setCurrency('USD').expect(200)
+        const dollarOrder = await request(app.getHttpServer())
+            .post('/api/orders')
+            .send(checkout())
+            .expect(201)
+        expect(dollarOrder.body.order.totals).toMatchObject({
+            exchangeRate: 854.4637,
+            exchangeRateCurrency: 'USD',
+        })
+        const reread = await request(app.getHttpServer())
+            .get(`/api/orders/${euroOrder.body.code}?t=${euroOrder.body.accessToken}`)
+            .expect(200)
+        expect(reread.body.totals).toMatchObject({ exchangeRateCurrency: 'EUR', totalBs: 35066.27 })
+    })
+
+    it('sets a manual rate for one currency', async () => {
+        const response = await request(app.getHttpServer())
+            .post('/api/admin/exchange-rate/manual')
+            .set('Cookie', cookie('admin'))
+            .send({ rate: 1010.5, currency: 'USDT' })
+            .expect(200)
+        const usdt = (response.body.rates as Row[]).find((entry) => entry.currency === 'USDT')
+        expect(usdt).toMatchObject({ current: { rate: 1010.5, source: 'manual' } })
+        expect(response.body.activeCurrency).toBe('USD')
+        // Without a currency the rate is the dollar's, as before.
+        await request(app.getHttpServer())
+            .post('/api/admin/exchange-rate/manual')
+            .set('Cookie', cookie('admin'))
+            .send({ rate: 860 })
+            .expect(200)
+        expect(db.table(ExchangeRate).at(-1)).toMatchObject({ currency: 'USD', rate: 860 })
+    })
+
     describe('checkout retries (Idempotency-Key)', () => {
         const KEY = '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f'
         const post = (body: Row, key?: string) => {

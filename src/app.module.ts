@@ -21,6 +21,7 @@ import { HealthController } from './health/health.controller.js'
 import { OrdersModule } from './orders/orders.module.js'
 import { OutboxModule } from './outbox/outbox.module.js'
 import { ProductsModule } from './products/products.module.js'
+import { RealtimeModule } from './realtime/realtime.module.js'
 import { SitemapModule } from './sitemap/sitemap.module.js'
 import { StorageModule } from './storage/storage.module.js'
 import { TelegramModule } from './telegram/telegram.module.js'
@@ -34,7 +35,7 @@ import { UsersModule } from './users/users.module.js'
             errorMessage: TOO_MANY_REQUESTS_MESSAGE,
         }),
         // Domain events (order.created, order.payment_submitted, order.status_changed,
-        // contact.message_received); the Telegram bot listens to them.
+        // contact.message_received); the Telegram bot and the SSE streams listen to them.
         EventEmitterModule.forRoot(),
         ScheduleModule.forRoot(),
         DatabaseModule,
@@ -54,6 +55,7 @@ import { UsersModule } from './users/users.module.js'
         PasswordResetModule,
         ContactModule,
         SitemapModule,
+        RealtimeModule,
     ],
     controllers: [HealthController],
     providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

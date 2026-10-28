@@ -16,6 +16,7 @@ import { OutboxMessage } from '../../src/outbox/entities/outbox-message.entity.j
 import { ProductImage } from '../../src/products/entities/product-image.entity.js'
 import { ProductVariant } from '../../src/products/entities/product-variant.entity.js'
 import { Product } from '../../src/products/entities/product.entity.js'
+import { AppSetting } from '../../src/settings/entities/app-setting.entity.js'
 import { catalogRepository } from './catalogs.js'
 
 export type Row = Record<string, unknown>
@@ -75,6 +76,7 @@ export class FakeDb {
         [ExchangeRate, []],
         [SiteContentEntry, []],
         [OutboxMessage, []],
+        [AppSetting, []],
     ])
 
     constructor() {
@@ -166,6 +168,7 @@ export class FakeDb {
         })
         this.table(ExchangeRate).push({
             id: 'rate-1',
+            currency: 'USD',
             rate: 854.4637,
             source: 'bcv',
             effectiveDate: caracasDay(),
@@ -492,6 +495,16 @@ export class FakeDb {
             existsBy: (where: Row) =>
                 Promise.resolve(this.table(entity).some((row) => matches(row, where))),
             insert: (rows: Row | Row[]) => this.insert(entity, rows),
+            /** By the conflict columns, like `INSERT … ON CONFLICT DO UPDATE`. */
+            upsert: (row: Row, conflictPaths: string[]) => {
+                const rows = this.table(entity)
+                const found = rows.find((candidate) =>
+                    conflictPaths.every((path) => candidate[path] === row[path]),
+                )
+                if (found) Object.assign(found, row)
+                else rows.push({ ...row })
+                return Promise.resolve({})
+            },
             update: (where: Row, changes: Row) => this.update(entity, where, changes),
             delete: (where: Row) => {
                 const rows = this.table(entity)

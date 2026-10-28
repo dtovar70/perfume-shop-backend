@@ -1,6 +1,7 @@
 import type { CallHandler, ExecutionContext } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { lastValueFrom, of, throwError } from 'rxjs'
+import type { RealtimeService } from '../realtime/realtime.service.js'
 import { CacheInvalidator } from './cache-invalidator.js'
 import { CACHE_KEYS } from './cache-keys.js'
 import { CacheInvalidationInterceptor, InvalidatesCache } from './invalidates-cache.decorator.js'
@@ -8,7 +9,10 @@ import { MemoryCache, type CacheEntrySpec } from './memory-cache.js'
 
 describe('CacheInvalidator', () => {
     const cache = new MemoryCache()
-    const invalidator = new CacheInvalidator(cache)
+    const publish = vi.fn()
+    const invalidator = new CacheInvalidator(cache, { publish } as unknown as RealtimeService)
+
+    beforeEach(() => publish.mockClear())
 
     /** Fills every cached value; returns a function listing the keys a second read reloads. */
     async function fillAll() {
@@ -21,7 +25,10 @@ describe('CacheInvalidator', () => {
             CACHE_KEYS.featured(8),
             CACHE_KEYS.sitemap(),
             CACHE_KEYS.content(),
-            CACHE_KEYS.latestExchangeRate(),
+            CACHE_KEYS.latestExchangeRate('USD'),
+            CACHE_KEYS.latestExchangeRate('EUR'),
+            CACHE_KEYS.latestExchangeRate('USDT'),
+            CACHE_KEYS.exchangeRateCurrency(),
         ]
         for (const spec of specs) await cache.getOrSet(spec, loader)
         const reloaded = async () => {
@@ -54,13 +61,31 @@ describe('CacheInvalidator', () => {
 
         reloaded = await fillAll()
         invalidator.invalidate('exchange-rate')
-        expect(await reloaded()).toEqual(['exchange-rate:latest'])
+        expect(await reloaded()).toEqual([
+            'exchange-rate:latest:USD',
+            'exchange-rate:latest:EUR',
+            'exchange-rate:latest:USDT',
+            'exchange-rate:currency',
+        ])
+    })
+
+    it('catalogs writes keep every cached value (their services hold their own copy)', async () => {
+        const reloaded = await fillAll()
+        invalidator.invalidate('catalogs')
+        expect(await reloaded()).toEqual([])
+    })
+
+    it('tells the open browsers what changed after every invalidation', () => {
+        invalidator.invalidate('content')
+        invalidator.invalidate('catalogs')
+        expect(publish.mock.calls).toEqual([[{ type: 'content' }], [{ type: 'catalogs' }]])
     })
 
     it('order events (stock changes) refresh the catalog', async () => {
         const reloaded = await fillAll()
         invalidator.onStockMayHaveChanged()
         expect(await reloaded()).toHaveLength(6)
+        expect(publish).toHaveBeenCalledWith({ type: 'catalog' })
     })
 })
 

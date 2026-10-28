@@ -4,6 +4,7 @@ import { CatalogsModule } from '../catalogs/catalogs.module.js'
 import { ContentModule } from '../content/content.module.js'
 import { ExchangeRateModule } from '../exchange-rate/exchange-rate.module.js'
 import { MailModule } from '../mail/mail.module.js'
+import { RealtimeModule } from '../realtime/realtime.module.js'
 import { AdminOrdersController } from './admin-orders.controller.js'
 import { AdminOrdersService } from './admin-orders.service.js'
 import { OrderEmailsService } from './emails/order-emails.service.js'
@@ -37,6 +38,7 @@ import { OrderWhatsAppService } from './whatsapp/order-whatsapp.service.js'
         ContentModule,
         ExchangeRateModule,
         MailModule,
+        RealtimeModule,
     ],
     controllers: [OrdersController, AdminOrdersController],
     providers: [

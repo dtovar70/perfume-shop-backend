@@ -6,10 +6,12 @@ import {
     Headers,
     HttpCode,
     HttpStatus,
+    type MessageEvent,
     Param,
     Post,
     Query,
     Res,
+    Sse,
     UploadedFile,
     UseFilters,
     UseInterceptors,
@@ -17,11 +19,14 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import type { Response } from 'express'
+import type { Observable } from 'rxjs'
 import { Public } from '../common/decorators/public.decorator.js'
+import { RealtimeService } from '../realtime/realtime.service.js'
 import { CreateOrderDto } from './dto/create-order.dto.js'
 import { OrderAccessQueryDto, OrderLookupDto } from './dto/order-access.dto.js'
 import { ORDER_LOOKUP_REQUESTED, OrderLookupService } from './emails/order-lookup.service.js'
 import { SubmitPaymentDto } from './dto/submit-payment.dto.js'
+import { OrderAccessService } from './order-access.service.js'
 import type { PublicOrderDto } from './order.mapper.js'
 import { OrdersService, type CreatedOrderDto } from './orders.service.js'
 import { sendReceipt } from './receipt/send-receipt.js'
@@ -47,6 +52,8 @@ export class OrdersController {
         private readonly orders: OrdersService,
         private readonly receipts: ReceiptService,
         private readonly lookups: OrderLookupService,
+        private readonly access: OrderAccessService,
+        private readonly realtime: RealtimeService,
     ) {}
 
     /**
@@ -101,6 +108,21 @@ export class OrdersController {
     @Header('Referrer-Policy', 'no-referrer')
     get(@Param('code') code: string, @Query() query: OrderAccessQueryDto): Promise<PublicOrderDto> {
         return this.orders.getForCustomer(code, query.t)
+    }
+
+    /**
+     * Server-Sent Events of this order: `data: {"type":"order","code":"KZ-000123"}` whenever it
+     * changes (placed, payment sent, status, expiry, refund), so the page refetches it. Same
+     * `?t=` check (and 404) as `GET :code`: `EventSource` cannot send headers anyway.
+     */
+    @Sse(':code/events')
+    @Header('Referrer-Policy', 'no-referrer')
+    async events(
+        @Param('code') code: string,
+        @Query() query: OrderAccessQueryDto,
+    ): Promise<Observable<MessageEvent>> {
+        const order = await this.access.findAuthorized(code, query.t)
+        return this.realtime.orderStream(order.code)
     }
 
     /** multipart/form-data: the text fields of SubmitPaymentDto plus an optional `proof` image. */

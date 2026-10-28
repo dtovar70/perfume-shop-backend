@@ -11,22 +11,32 @@ import {
 import { User } from '../../auth/entities/user.entity.js'
 import { decimalTransformer } from '../../database/decimal.transformer.js'
 import type { RateSource } from '../providers/rate-provider.js'
+import { RATE_CURRENCIES, type RateCurrency } from '../rate-currency.js'
 
 /**
- * BCV bolívar/dollar rates, newest last. A row is added when a provider reports a rate that
- * differs from the last automatic one, or when an admin sets one by hand. Checkout always uses
- * the newest row (see ExchangeRateService).
+ * Bolívar rates per currency (BCV dollar, BCV euro, USDT on Binance), newest last. A row is
+ * added when a provider reports a rate that differs from the last automatic one of its currency,
+ * or when an admin sets one by hand. Checkout uses the newest row of the business's active
+ * currency (see ExchangeRateService).
  */
 
 @Entity({ name: 'exchange_rates' })
-@Index('exchange_rates_fetched_at_idx', ['fetchedAt'])
+@Index('exchange_rates_currency_fetched_at_idx', ['currency', 'fetchedAt'])
 @Check('exchange_rates_rate_check', `"rate" > 0`)
-@Check('exchange_rates_source_check', `"source" IN ('bcv', 'dolarapi', 'manual')`)
+@Check('exchange_rates_source_check', `"source" IN ('bcv', 'dolarapi', 'binance', 'manual')`)
+@Check(
+    'exchange_rates_currency_check',
+    `"currency" IN (${RATE_CURRENCIES.map((currency) => `'${currency}'`).join(', ')})`,
+)
 export class ExchangeRate {
     @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'exchange_rates_pkey' })
     id: string
 
-    /** Bolívares per US dollar. */
+    /** What one unit of `rate` is: rows before the choice existed are all 'USD'. */
+    @Column({ type: 'text', default: 'USD' })
+    currency: RateCurrency
+
+    /** Bolívares per unit of `currency`. */
     @Column({ type: 'numeric', precision: 12, scale: 4, transformer: decimalTransformer })
     rate: number
 

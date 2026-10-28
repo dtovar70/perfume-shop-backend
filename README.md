@@ -179,6 +179,18 @@ featured products (60 s), the site content and the current exchange rate in memo
 (`src/cache`); every admin write, order stock change, content edit and rate change invalidates
 what it affects (`CacheInvalidator`).
 
+Live updates (Server-Sent Events, `src/realtime`): every `CacheInvalidator` invalidation is also
+pushed to the open browsers as `data: {"type":"catalog" | "catalogs" | "content" | "exchange-rate"}`,
+and every order event as `{"type":"order","code"}`. Only what changed travels, never the data:
+clients refetch through the regular endpoints. A `: ping` comment every 25 s keeps proxies from
+dropping idle streams; Nest sends `X-Accel-Buffering: no`. In-process (single instance only).
+
+- `GET /events` (public): catalog, catalogs, content and exchange-rate changes
+- `GET /orders/:code/events?t=<token>` (public): that order's changes; same token check and `404`
+  as `GET /orders/:code`
+- `GET /admin/events` (ADMIN, EDITOR; session cookie, `EventSource` with `withCredentials`):
+  everything, orders included; the stream ends when the session token expires
+
 Auth (session = httpOnly cookie `kz_session`):
 
 - `POST /auth/login` `{ email, password }` (rate-limited to 5/min) → user + `session`. The email

@@ -8,6 +8,7 @@ import { ContentService } from '../content/content.service.js'
 import { isPaymentConfigured } from '../content/content.types.js'
 import { newId } from '../database/id.js'
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
+import type { RateCurrency } from '../exchange-rate/rate-currency.js'
 import { readStock } from '../products/product-stock.js'
 import type { Paginated } from '../products/product.mapper.js'
 import {
@@ -65,6 +66,8 @@ export interface AdminOrdersSummaryDto {
     pendingRefunds: number
     paymentConfigured: boolean
     exchangeRate: {
+        /** The currency the business converts with. */
+        currency: RateCurrency
         available: boolean
         isStale: boolean
         rate: number | null
@@ -250,17 +253,19 @@ export class AdminOrdersService {
             .getRawMany<{ status: OrderStatus; count: number }>()
         const count = (status: OrderStatus) =>
             Number(rows.find((row) => row.status === status)?.count ?? 0)
-        const [{ payment }, current, pendingRefunds] = await Promise.all([
+        const [{ payment }, currency, pendingRefunds] = await Promise.all([
             this.content.getAll(),
-            this.rates.current(),
+            this.rates.activeCurrency(),
             this.dataSource.getRepository(Order).count({ where: { refundStatus: 'PENDIENTE' } }),
         ])
+        const current = await this.rates.current(currency)
         return {
             pendingVerification: count('PENDIENTE_VERIFICACION'),
             pendingPayment: count('PENDIENTE_PAGO'),
             pendingRefunds,
             paymentConfigured: isPaymentConfigured(payment),
             exchangeRate: {
+                currency,
                 available: current !== null && !current.isStale,
                 isStale: current?.isStale ?? false,
                 rate: current?.rate ?? null,

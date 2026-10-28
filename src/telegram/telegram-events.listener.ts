@@ -11,7 +11,7 @@ import { TelegramContactService } from './telegram-contact.service.js'
 import { rateSyncFailingMessage, rateSyncRecoveredMessage } from './telegram-format.js'
 import { TelegramPaymentsService } from './telegram-payments.service.js'
 
-/** The admin panel's "Tasa BCV" section (frontend ADMIN_ROUTES.exchangeRate). */
+/** The admin panel's "Tasa de cambio" section (frontend ADMIN_ROUTES.exchangeRate). */
 const EXCHANGE_RATE_PANEL_PATH = '/admin/tasa-bcv'
 
 /**

@@ -144,8 +144,10 @@ const envObject = z.object({
      * business day's rate the afternoon before, so a newer rate should always be there by then.
      */
     EXCHANGE_RATE_MAX_AGE_HOURS: z.coerce.number().positive().max(720).default(24),
-    /** How often the BCV rate is fetched (it is also fetched at startup). */
+    /** How often the BCV rates (dollar and euro) are fetched (also at startup). */
     EXCHANGE_RATE_SYNC_INTERVAL_MINUTES: z.coerce.number().positive().max(1440).default(120),
+    /** How often the USDT Binance P2P price is fetched (also at startup): it moves intraday. */
+    EXCHANGE_RATE_USDT_SYNC_INTERVAL_MINUTES: z.coerce.number().positive().max(1440).default(10),
     /**
      * Background jobs (rate sync, order expiry). Default: on, except under NODE_ENV=test so the
      * test suites never reach the network or the scheduler.

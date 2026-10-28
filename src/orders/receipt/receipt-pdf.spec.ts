@@ -32,6 +32,7 @@ function receipt(items: number): ReceiptData {
         shippingUsd: 0,
         totalUsd: 32 * items,
         exchangeRate: 854.4637,
+        exchangeRateCurrency: 'USD',
         exchangeRateDate: '24/09/2026',
         exchangeRateSource: 'BCV (bcv.org.ve)',
         totalBs: 27342.84 * items,

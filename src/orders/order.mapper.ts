@@ -1,6 +1,7 @@
 import { caracasDay } from '../common/utils/caracas-date.js'
 import type { PaymentContent } from '../content/content.types.js'
-import { RATE_SOURCE_LABELS, type RateSource } from '../exchange-rate/providers/rate-provider.js'
+import { rateSourceLabel, type RateSource } from '../exchange-rate/providers/rate-provider.js'
+import type { RateCurrency } from '../exchange-rate/rate-currency.js'
 import type { OrderItem } from './entities/order-item.entity.js'
 import type { OrderNote } from './entities/order-note.entity.js'
 import type { OrderPayment, PaymentSource, PaymentStatus } from './entities/order-payment.entity.js'
@@ -50,7 +51,9 @@ export interface OrderTotalsDto {
     shippingUsd: number
     totalUsd: number
     totalBs: number
+    /** Bs per unit of `exchangeRateCurrency` (prices are always in dollars). */
     exchangeRate: number
+    exchangeRateCurrency: RateCurrency
     exchangeRateDate: string
     exchangeRateSource: RateSource
     exchangeRateSourceLabel: string
@@ -268,9 +271,13 @@ function toTotals(order: Order): OrderTotalsDto {
         totalUsd: order.totalUsd,
         totalBs: order.totalBs,
         exchangeRate: order.exchangeRate,
+        exchangeRateCurrency: order.exchangeRateCurrency ?? 'USD',
         exchangeRateDate: order.exchangeRateDate,
         exchangeRateSource: order.exchangeRateSource,
-        exchangeRateSourceLabel: RATE_SOURCE_LABELS[order.exchangeRateSource],
+        exchangeRateSourceLabel: rateSourceLabel(
+            order.exchangeRateSource,
+            order.exchangeRateCurrency ?? 'USD',
+        ),
     }
 }
 

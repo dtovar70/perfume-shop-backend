@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, HttpCode, HttpStatus, Post } from '@nestjs/common'
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Post, Put } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { Role } from '../auth/role.enum.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
@@ -6,6 +6,7 @@ import { Public } from '../common/decorators/public.decorator.js'
 import { PublicCache } from '../common/http/public-cache.js'
 import { Roles } from '../common/decorators/roles.decorator.js'
 import type { AuthUser } from '../common/types/auth-user.js'
+import { ActiveCurrencyDto } from './dto/active-currency.dto.js'
 import { ManualRateDto } from './dto/manual-rate.dto.js'
 import {
     ExchangeRateService,
@@ -14,7 +15,10 @@ import {
     type SyncResult,
 } from './exchange-rate.service.js'
 
-/** The storefront shows approximate bolívar amounts in the cart and checkout with this. */
+/**
+ * The storefront shows approximate bolívar amounts in the cart and checkout with this: the rate
+ * of the currency the business converts with.
+ */
 @Public()
 @Controller('exchange-rate')
 export class ExchangeRateController {
@@ -38,7 +42,7 @@ export class AdminExchangeRateController {
         return this.rates.adminView()
     }
 
-    /** Asks the providers right away ("Actualizar ahora"). */
+    /** Asks the providers for every currency right away ("Actualizar ahora"). */
     @Post('refresh')
     @HttpCode(HttpStatus.OK)
     @Throttle({ default: { limit: 6, ttl: 60_000 } })
@@ -55,6 +59,16 @@ export class AdminExchangeRateController {
         @Body() dto: ManualRateDto,
         @CurrentUser() user: AuthUser,
     ): Promise<AdminExchangeRateDto> {
-        return this.rates.setManual(dto.rate, dto.effectiveDate, user)
+        return this.rates.setManual(dto.currency ?? 'USD', dto.rate, dto.effectiveDate, user)
+    }
+
+    /** Which rate checkout converts with ("Dólar BCV", "Euro BCV", "USDT Binance"). */
+    @Roles(Role.ADMIN)
+    @Put('active-currency')
+    setActiveCurrency(
+        @Body() dto: ActiveCurrencyDto,
+        @CurrentUser() user: AuthUser,
+    ): Promise<AdminExchangeRateDto> {
+        return this.rates.setActiveCurrency(dto.currency, user)
     }
 }

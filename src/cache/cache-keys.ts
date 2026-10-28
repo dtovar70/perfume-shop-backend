@@ -2,6 +2,7 @@ import type { PublicBrandDto } from '../brands/brands.service.js'
 import type { CategoryDto } from '../categories/categories.service.js'
 import type { SiteContent } from '../content/content.types.js'
 import type { ExchangeRate } from '../exchange-rate/entities/exchange-rate.entity.js'
+import type { RateCurrency } from '../exchange-rate/rate-currency.js'
 import type { CatalogFacetsDto } from '../products/catalog.service.js'
 import type { PublicProductDto } from '../products/product.mapper.js'
 import type { CacheEntrySpec } from './memory-cache.js'
@@ -21,6 +22,8 @@ const CATALOG_TTL_MS = 60_000
  * long another instance (or a manual database edit) can go unseen.
  */
 const CONTENT_TTL_MS = 10 * 60_000
+/** The newest rate of each currency and the active currency; dropped together. */
+export const EXCHANGE_RATE_PREFIX = 'exchange-rate:'
 /** Short: checkout prices orders with it, and a sync on another instance must show up soon. */
 const EXCHANGE_RATE_TTL_MS = 60_000
 /**
@@ -42,6 +45,12 @@ export const CACHE_KEYS = {
     /** The rendered `/sitemap.xml`. */
     sitemap: () => entry<string>(`${CATALOG_PREFIX}sitemap`, SITEMAP_TTL_MS),
     content: () => entry<SiteContent>('content:all', CONTENT_TTL_MS),
-    latestExchangeRate: () =>
-        entry<ExchangeRate | null>('exchange-rate:latest', EXCHANGE_RATE_TTL_MS),
+    latestExchangeRate: (currency: RateCurrency) =>
+        entry<ExchangeRate | null>(
+            `${EXCHANGE_RATE_PREFIX}latest:${currency}`,
+            EXCHANGE_RATE_TTL_MS,
+        ),
+    /** The rate the business converts with (`app_settings`). */
+    exchangeRateCurrency: () =>
+        entry<RateCurrency>(`${EXCHANGE_RATE_PREFIX}currency`, EXCHANGE_RATE_TTL_MS),
 } as const

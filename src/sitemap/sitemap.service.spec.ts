@@ -5,6 +5,7 @@ import { CacheInvalidator } from '../cache/cache-invalidator.js'
 import { MemoryCache } from '../cache/memory-cache.js'
 import type { Env } from '../config/env.schema.js'
 import type { Product } from '../products/entities/product.entity.js'
+import { RealtimeService } from '../realtime/realtime.service.js'
 import { absoluteUrl, buildSitemapXml, escapeXml } from './sitemap-xml.js'
 import { SitemapService } from './sitemap.service.js'
 
@@ -112,7 +113,7 @@ describe('SitemapService', () => {
         await service.xml()
         expect(products.find).toHaveBeenCalledTimes(1)
 
-        new CacheInvalidator(cache).invalidate('catalog')
+        new CacheInvalidator(cache, new RealtimeService()).invalidate('catalog')
         await service.xml()
         expect(products.find).toHaveBeenCalledTimes(2)
     })

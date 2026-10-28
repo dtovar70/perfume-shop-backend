@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 import { OrderStatusCatalogService } from '../../catalogs/order-status-catalog.service.js'
 import { ContentService } from '../../content/content.service.js'
-import { RATE_SOURCE_LABELS } from '../../exchange-rate/providers/rate-provider.js'
+import { rateSourceLabel } from '../../exchange-rate/providers/rate-provider.js'
 import { Order } from '../entities/order.entity.js'
 import { OrderAccessService } from '../order-access.service.js'
 import { ORDER_NOT_FOUND } from '../order-status.service.js'
@@ -129,9 +129,12 @@ export class ReceiptService {
             shippingUsd: order.shippingUsd,
             totalUsd: order.totalUsd,
             exchangeRate: order.exchangeRate,
+            exchangeRateCurrency: order.exchangeRateCurrency ?? 'USD',
             exchangeRateDate: formatDay(order.exchangeRateDate),
-            exchangeRateSource:
-                RATE_SOURCE_LABELS[order.exchangeRateSource] ?? order.exchangeRateSource,
+            exchangeRateSource: rateSourceLabel(
+                order.exchangeRateSource,
+                order.exchangeRateCurrency ?? 'USD',
+            ),
             totalBs: order.totalBs,
             payment: {
                 bankName: payment.payerBankName,

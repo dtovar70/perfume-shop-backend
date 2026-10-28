@@ -43,6 +43,7 @@ describe('envSchema (orders and exchange rate)', () => {
         expect(env.ORDER_EXPIRY_INTERVAL_MINUTES).toBe(10)
         expect(env.EXCHANGE_RATE_MAX_AGE_HOURS).toBe(24)
         expect(env.EXCHANGE_RATE_SYNC_INTERVAL_MINUTES).toBe(120)
+        expect(env.EXCHANGE_RATE_USDT_SYNC_INTERVAL_MINUTES).toBe(10)
         expect(env.SCHEDULED_JOBS_ENABLED).toBeUndefined()
     })
 

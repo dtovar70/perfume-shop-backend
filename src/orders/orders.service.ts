@@ -266,6 +266,7 @@ export class OrdersService {
                 notes: dto.notes ?? '',
                 ...totals,
                 exchangeRate: rate.rate,
+                exchangeRateCurrency: rate.currency,
                 exchangeRateSource: rate.source,
                 exchangeRateDate: rate.effectiveDate,
                 exchangeRateId: rate.id,

@@ -2,10 +2,13 @@ import { request } from 'node:https'
 import { rootCertificates } from 'node:tls'
 import { isDateOnly } from '../../common/utils/caracas-date.js'
 import { SECTIGO_DV_R36_PEM } from './bcv-ca.js'
+import type { RateCurrency } from '../rate-currency.js'
 import {
     assertPlausibleRate,
+    readEach,
     type ExchangeRateProvider,
     type FetchedRate,
+    type ProviderRates,
 } from './rate-provider.js'
 
 export const BCV_URL = 'https://www.bcv.org.ve/'
@@ -24,21 +27,25 @@ function parseVeNumber(text: string): number {
     return /^\d+(?:\.\d+)?$/.test(normalized) ? Number(normalized) : Number.NaN
 }
 
-/**
- * Reads the USD rate and its "fecha valor" from the BCV home page. The rate sits in the
- * `<div id="dolar">` block (`<strong>854,46370000</strong>`), and the date in the
- * `Fecha Valor: <span … content="2026-09-24T00:00:00-04:00">` that follows the rates.
- */
-export function parseBcvHtml(html: string): FetchedRate {
-    const dollarStart = html.indexOf('id="dolar"')
-    if (dollarStart < 0) throw new Error('BCV: USD block not found')
-    const afterDollar = html.slice(dollarStart)
+/** The `<div id="…">` block of each currency on the BCV home page. */
+const BCV_BLOCK_IDS = { USD: 'dolar', EUR: 'euro' } as const
+export type BcvCurrency = keyof typeof BCV_BLOCK_IDS
 
-    const rateMatch = /<strong[^>]*>\s*([\d.,]+)\s*<\/strong>/.exec(afterDollar)
-    if (!rateMatch?.[1]) throw new Error('BCV: USD rate not found')
+/**
+ * Reads a rate and its "fecha valor" from the BCV home page. Each rate sits in its own block
+ * (`<div id="dolar">`, `<div id="euro">`: `<strong>854,46370000</strong>`), and the date in the
+ * `Fecha Valor: <span … content="2026-09-24T00:00:00-04:00">` that follows all the rates.
+ */
+export function parseBcvHtml(html: string, currency: BcvCurrency = 'USD'): FetchedRate {
+    const blockStart = html.indexOf(`id="${BCV_BLOCK_IDS[currency]}"`)
+    if (blockStart < 0) throw new Error(`BCV: ${currency} block not found`)
+    const afterBlock = html.slice(blockStart)
+
+    const rateMatch = /<strong[^>]*>\s*([\d.,]+)\s*<\/strong>/.exec(afterBlock)
+    if (!rateMatch?.[1]) throw new Error(`BCV: ${currency} rate not found`)
     const rate = assertPlausibleRate(parseVeNumber(rateMatch[1]), 'BCV')
 
-    const dateMatch = /Fecha\s+Valor:[\s\S]{0,200}?content="(\d{4}-\d{2}-\d{2})T/.exec(afterDollar)
+    const dateMatch = /Fecha\s+Valor:[\s\S]{0,200}?content="(\d{4}-\d{2}-\d{2})T/.exec(afterBlock)
     const effectiveDate = dateMatch?.[1]
     if (!effectiveDate || !isDateOnly(effectiveDate)) throw new Error('BCV: fecha valor not found')
 
@@ -81,11 +88,18 @@ function download(url: string): Promise<string> {
     })
 }
 
-/** The official source: the BCV website. */
+/** The official source: the BCV website (dollar and euro from one download). */
 export class BcvProvider implements ExchangeRateProvider {
     readonly source = 'bcv' as const
+    readonly currencies: readonly RateCurrency[] = ['USD', 'EUR']
 
-    async fetchRate(): Promise<FetchedRate> {
-        return parseBcvHtml(await download(BCV_URL))
+    async fetchRates(currencies: readonly RateCurrency[]): Promise<ProviderRates> {
+        const html = await download(BCV_URL)
+        return readEach(currencies, (currency) => {
+            if (currency !== 'USD' && currency !== 'EUR') {
+                throw new Error(`BCV: ${currency} is not published`)
+            }
+            return parseBcvHtml(html, currency)
+        })
     }
 }

@@ -19,6 +19,7 @@ import { User } from '../../auth/entities/user.entity.js'
 import { decimalTransformer } from '../../database/decimal.transformer.js'
 import { ExchangeRate } from '../../exchange-rate/entities/exchange-rate.entity.js'
 import type { RateSource } from '../../exchange-rate/providers/rate-provider.js'
+import { RATE_CURRENCIES, type RateCurrency } from '../../exchange-rate/rate-currency.js'
 import type { DeliveryMethod } from '../order-pricing.js'
 import {
     ORDER_STATUSES,
@@ -61,7 +62,7 @@ export interface StockConflict {
 }
 
 /**
- * A guest order. Prices, shipping and the BCV rate are computed by the server and frozen here
+ * A guest order. Prices, shipping and the exchange rate are computed by the server and frozen here
  * when the order is created; the items keep their own product snapshots.
  */
 
@@ -75,6 +76,10 @@ export interface StockConflict {
 @Check(
     'orders_status_check',
     `"status" IN (${ORDER_STATUSES.map((status) => `'${status}'`).join(', ')})`,
+)
+@Check(
+    'orders_exchange_rate_currency_check',
+    `"exchange_rate_currency" IN (${RATE_CURRENCIES.map((currency) => `'${currency}'`).join(', ')})`,
 )
 @Check('orders_delivery_method_check', `"delivery_method" IN ('delivery', 'pickup')`)
 @Check('orders_notes_length_check', `char_length("notes") <= ${ORDER_LIMITS.notes}`)
@@ -155,7 +160,10 @@ export class Order {
     })
     totalUsd: number
 
-    /** Snapshot of the BCV rate used (Bs per USD). */
+    /**
+     * Snapshot of the rate used: Bs per unit of `exchangeRateCurrency`. Prices stay in dollars,
+     * so `total_bs` is always `total_usd` x this rate, whatever the currency.
+     */
     @Column({
         name: 'exchange_rate',
         type: 'numeric',
@@ -164,6 +172,10 @@ export class Order {
         transformer: decimalTransformer,
     })
     exchangeRate: number
+
+    /** Which rate the business used (BCV dollar, BCV euro, USDT); 'USD' for older orders. */
+    @Column({ name: 'exchange_rate_currency', type: 'text', default: 'USD' })
+    exchangeRateCurrency: RateCurrency
 
     @Column({ name: 'exchange_rate_source', type: 'text' })
     exchangeRateSource: RateSource

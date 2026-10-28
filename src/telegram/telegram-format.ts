@@ -11,6 +11,8 @@ import type {
     RateSyncFailingEvent,
     RateSyncRecoveredEvent,
 } from '../exchange-rate/exchange-rate.events.js'
+import type { AutomaticRateSource } from '../exchange-rate/providers/rate-provider.js'
+import { RATE_NAMES, RATE_UNITS, type RateCurrency } from '../exchange-rate/rate-currency.js'
 import type { StockConflict, StockConflictLine } from '../orders/entities/order.entity.js'
 import type { ContactMessageReceivedEvent } from '../contact/contact.events.js'
 import { CONTACT_TOPIC_LABELS } from '../contact/contact.constants.js'
@@ -86,6 +88,7 @@ export interface PaymentMessageData {
     totalUsd: number
     totalBs: number
     exchangeRate: number
+    exchangeRateCurrency: RateCurrency
     stockConflict: StockConflict | null
     payment: {
         reference: string
@@ -178,7 +181,7 @@ export function paymentMessage(
         itemLines(data.items),
         [
             `💵 <b>Total:</b> ${formatUsd(data.totalUsd)} · ${formatBs(data.totalBs)}`,
-            `<i>Tasa BCV ${formatVeNumber(data.exchangeRate)}</i>`,
+            `<i>${rateCaption(data.exchangeRateCurrency, data.exchangeRate)}</i>`,
         ],
         [
             '💳 <b>Pago Móvil</b>',
@@ -249,11 +252,45 @@ export function orderSummaryMessage(data: OrderSummaryData): string {
     return lines.join('\n')
 }
 
+/** "la tasa del BCV" in the sync alerts' titles, per currency. */
+const SYNC_ALERT_SUBJECTS: Record<RateCurrency, string> = {
+    USD: 'la tasa del BCV',
+    EUR: 'la tasa del euro BCV',
+    USDT: 'la tasa USDT de Binance',
+}
+
+const SOURCE_NAMES: Record<AutomaticRateSource, string> = {
+    bcv: 'BCV',
+    dolarapi: 'DolarApi',
+    binance: 'Binance',
+}
+
 /** The rate line of the sync alerts: "Tasa actual: 36,5000 Bs/$ (fecha valor 25/09/2026)". */
 function currentRateLine(current: RateSnapshot | null): string {
     return current
-        ? `Tasa actual: <b>${formatVeNumber(current.rate, 4)} Bs/$</b> (fecha valor ${formatDay(current.effectiveDate)})`
+        ? `Tasa actual: <b>${formatVeNumber(current.rate, 4)} ${RATE_UNITS[current.currency]}</b> (fecha valor ${formatDay(current.effectiveDate)})`
         : 'Todavía no hay ninguna tasa guardada.'
+}
+
+/** "BCV y DolarApi": the providers the failed runs tried. */
+function sourceNames(event: RateSyncFailingEvent): string {
+    const names = [...new Set(event.errors.map((entry) => SOURCE_NAMES[entry.source]))]
+    if (!names.length) return SYNC_ALERT_DEFAULT_SOURCES[event.currency]
+    return names.length === 1
+        ? names[0]!
+        : `${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}`
+}
+
+const SYNC_ALERT_DEFAULT_SOURCES: Record<RateCurrency, string> = {
+    USD: 'BCV y DolarApi',
+    EUR: 'BCV y DolarApi',
+    USDT: 'Binance',
+}
+
+/** "Tasa BCV 854,46" (dollar, as always) or "Tasa BCV (€) 974,06 Bs/€". */
+export function rateCaption(currency: RateCurrency, rate: number): string {
+    const text = `${RATE_NAMES[currency]} ${formatVeNumber(rate)}`
+    return currency === 'USD' ? text : `${text} ${RATE_UNITS[currency]}`
 }
 
 /** Sent once when the automatic rate sync keeps failing. */
@@ -265,17 +302,21 @@ export function rateSyncFailingMessage(event: RateSyncFailingEvent): string {
           ? '⛔ <b>Los pedidos ya están pausados</b>: la tasa guardada venció.'
           : `⏳ Si no llega una tasa nueva, <b>los pedidos se pausan el ${formatCaracasDateTime(new Date(current.usableUntil))}</b>.`
     return [
-        '⚠️ <b>No se pudo obtener la tasa del BCV</b>',
-        `Fallaron ${event.consecutiveFailures} intentos seguidos (BCV y DolarApi).`,
+        `⚠️ <b>No se pudo obtener ${SYNC_ALERT_SUBJECTS[event.currency]}</b>`,
+        `Fallaron ${event.consecutiveFailures} intentos seguidos (${sourceNames(event)}).`,
         currentRateLine(current),
         pause,
-        'Puedes cargarla a mano en el panel, sección <b>Tasa BCV</b>.',
+        'Puedes cargarla a mano en el panel, sección <b>Tasa de cambio</b>.',
     ].join('\n')
 }
 
 /** Sent once when a sync succeeds after the failing alert. */
 export function rateSyncRecoveredMessage(event: RateSyncRecoveredEvent): string {
-    const lines = ['✅ <b>La tasa del BCV se volvió a obtener</b>', currentRateLine(event.current)]
+    const subject = SYNC_ALERT_SUBJECTS[event.currency]
+    const lines = [
+        `✅ <b>${subject.charAt(0).toUpperCase()}${subject.slice(1)} se volvió a obtener</b>`,
+        currentRateLine(event.current),
+    ]
     if (event.current?.isStale) {
         lines.push('⚠️ Esa tasa sigue vencida: los pedidos siguen pausados.')
     }

@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import PDFDocument from 'pdfkit'
 import { formatBs, formatUsd, formatVeNumber } from '../../common/utils/money-format.js'
+import { RATE_NAMES, type RateCurrency } from '../../exchange-rate/rate-currency.js'
 
 /** Everything printed on the receipt, already resolved (labels, Caracas dates as text). */
 export interface ReceiptData {
@@ -29,6 +30,7 @@ export interface ReceiptData {
     shippingUsd: number
     totalUsd: number
     exchangeRate: number
+    exchangeRateCurrency: RateCurrency
     /** "24/09/2026". */
     exchangeRateDate: string
     exchangeRateSource: string
@@ -384,7 +386,11 @@ class ReceiptLayout {
             ['Subtotal', formatUsd(data.subtotalUsd), 'normal'],
             ['Envío', data.shippingUsd > 0 ? formatUsd(data.shippingUsd) : 'Gratis', 'normal'],
             ['Total USD', formatUsd(data.totalUsd), 'strong'],
-            ['Tasa BCV', `${formatVeNumber(data.exchangeRate, 4)} Bs./USD`, 'soft'],
+            [
+                RATE_NAMES[data.exchangeRateCurrency],
+                `${formatVeNumber(data.exchangeRate, 4)} Bs./${data.exchangeRateCurrency}`,
+                'soft',
+            ],
             ['Fecha de la tasa', `${data.exchangeRateDate} · ${data.exchangeRateSource}`, 'soft'],
         ]
         const payment: [string, string][] = [

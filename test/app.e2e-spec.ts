@@ -1,8 +1,10 @@
+import type { AddressInfo } from 'node:net'
 import { type INestApplication, Logger } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { getDataSourceToken } from '@nestjs/typeorm'
 import request from 'supertest'
 import { AppModule } from '../src/app.module.js'
+import { CacheInvalidator } from '../src/cache/cache-invalidator.js'
 import { createValidationPipe } from '../src/common/pipes/validation.pipe.js'
 import { catalogRepository } from './fixtures/catalogs.js'
 
@@ -127,5 +129,41 @@ describe('App (e2e)', () => {
         expect(response.body.details).toEqual([
             { field: 'foo', errors: ['El campo "foo" no está permitido.'] },
         ])
+    })
+
+    it('GET /api/events streams what changed, unbuffered', async () => {
+        await app.listen(0)
+        const { port } = app.getHttpServer().address() as AddressInfo
+        const controller = new AbortController()
+        try {
+            const response = await fetch(`http://127.0.0.1:${port}/api/events`, {
+                signal: controller.signal,
+            })
+            expect(response.status).toBe(200)
+            expect(response.headers.get('content-type')).toBe('text/event-stream')
+            expect(response.headers.get('x-accel-buffering')).toBe('no')
+
+            const reader = response.body?.getReader()
+            if (!reader) throw new Error('no body')
+            app.get(CacheInvalidator).invalidate('catalog')
+            const decoder = new TextDecoder()
+            let text = ''
+            while (!text.includes('data: ')) {
+                const { value, done } = await reader.read()
+                if (done) break
+                text += decoder.decode(value)
+            }
+            expect(text).toContain('data: {"type":"catalog"}')
+        } finally {
+            controller.abort()
+        }
+    })
+
+    it('GET /api/admin/events without a session is rejected', () => {
+        return request(app.getHttpServer()).get('/api/admin/events').expect(401)
+    })
+
+    it('GET /api/orders/:code/events answers 404 like the order page for an unknown order', () => {
+        return request(app.getHttpServer()).get('/api/orders/nope/events?t=x').expect(404)
     })
 })

@@ -18,6 +18,7 @@ import { ProductImage } from '../products/entities/product-image.entity.js'
 import { ProductVariant } from '../products/entities/product-variant.entity.js'
 import { OutboxMessage } from '../outbox/entities/outbox-message.entity.js'
 import { Product } from '../products/entities/product.entity.js'
+import { AppSetting } from '../settings/entities/app-setting.entity.js'
 import { TelegramChat } from '../telegram/entities/telegram-chat.entity.js'
 import { TelegramLinkCode } from '../telegram/entities/telegram-link-code.entity.js'
 import { TelegramMessage } from '../telegram/entities/telegram-message.entity.js'
@@ -47,4 +48,5 @@ export const ENTITIES = [
     TelegramMessage,
     PasswordResetCode,
     OutboxMessage,
+    AppSetting,
 ]

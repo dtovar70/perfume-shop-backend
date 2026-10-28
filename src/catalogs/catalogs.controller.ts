@@ -11,6 +11,7 @@ import {
     Post,
 } from '@nestjs/common'
 import { Role } from '../auth/role.enum.js'
+import { InvalidatesCache } from '../cache/invalidates-cache.decorator.js'
 import { Public } from '../common/decorators/public.decorator.js'
 import { Roles } from '../common/decorators/roles.decorator.js'
 import { BANK_ORDER_ROUTE, BanksService, type AdminBankDto, type BankDto } from './banks.service.js'
@@ -71,9 +72,11 @@ export class CatalogsController {
 
 /**
  * Catalog editing (ADMIN only). Status codes, their group and `isTerminal` are fixed: the order
- * workflow depends on them, so the DTOs do not accept them (400).
+ * workflow depends on them, so the DTOs do not accept them (400). Every write tells the open
+ * storefronts to refetch the catalogs (checkout banks, status labels).
  */
 @Roles(Role.ADMIN)
+@InvalidatesCache('catalogs')
 @Controller('admin/catalogs')
 export class AdminCatalogsController {
     constructor(

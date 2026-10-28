@@ -32,6 +32,7 @@ const ORDER: OrderReceivedData = {
     totalUsd: 36,
     totalBs: 30760.69,
     exchangeRate: 854.4637,
+    exchangeRateCurrency: 'USD',
     exchangeRateDate: '2026-09-25',
     // 11:05 a. m. in Caracas (UTC-4).
     paymentDueAt: new Date('2026-09-26T15:05:00Z'),
@@ -74,6 +75,21 @@ describe('order emails', () => {
             'Subtotal: $32,00\nEnvío: $4,00\nTotal: $36,00\nTotal en bolívares: Bs. 30.760,69',
         )
         expect(text).toContain('Tasa BCV del 25/09/2026: 854,4637 Bs/$')
+        // The order's own currency names the rate: euro and USDT orders say so.
+        const euro = orderReceivedEmail(
+            { ...ORDER, exchangeRateCurrency: 'EUR', exchangeRate: 974.063 },
+            PAYMENT,
+            LINK,
+            SHOP,
+        )
+        expect(euro.text).toContain('Tasa BCV (€) del 25/09/2026: 974,0630 Bs/€')
+        const usdt = orderReceivedEmail(
+            { ...ORDER, exchangeRateCurrency: 'USDT', exchangeRate: 1007.7 },
+            PAYMENT,
+            LINK,
+            SHOP,
+        )
+        expect(usdt.text).toContain('Tasa USDT Binance del 25/09/2026: 1.007,7000 Bs/USDT')
         expect(text).toContain(
             'Datos para tu Pago Móvil\nBanco: 0134 - Banesco\nTeléfono: 0412-5550134\nCédula / RIF: V-12345678\nTitular: KaiZen C.A.\nMonto exacto: Bs. 30.760,69\nConcepto: Pedido KZ-000123',
         )

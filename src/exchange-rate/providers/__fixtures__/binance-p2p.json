@@ -1,0 +1,149 @@
+{
+    "code": "000000",
+    "message": null,
+    "messageDetail": null,
+    "data": [
+        {
+            "adv": {
+                "advNo": "12944497731478355968",
+                "classify": "mass",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "980.540",
+                "surplusAmount": "100.00",
+                "tradableQuantity": "99.75",
+                "maxSingleTransAmount": "400",
+                "minSingleTransAmount": "300"
+            }
+        },
+        {
+            "adv": {
+                "advNo": "12946640550529867776",
+                "classify": "mass",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "1006.000",
+                "surplusAmount": "0.34",
+                "tradableQuantity": "0.33",
+                "maxSingleTransAmount": "4000000",
+                "minSingleTransAmount": "300"
+            }
+        },
+        {
+            "adv": {
+                "advNo": "12948765772083470336",
+                "classify": "mass",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "1006.500",
+                "surplusAmount": "209.00",
+                "tradableQuantity": "208.47",
+                "maxSingleTransAmount": "55000",
+                "minSingleTransAmount": "50000"
+            }
+        },
+        {
+            "adv": {
+                "advNo": "13898725931485347840",
+                "classify": "profession",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "1007.000",
+                "surplusAmount": "322.66",
+                "tradableQuantity": "322.01",
+                "maxSingleTransAmount": "2000000",
+                "minSingleTransAmount": "10000"
+            }
+        },
+        {
+            "adv": {
+                "advNo": "12948770667751206912",
+                "classify": "mass",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "1007.500",
+                "surplusAmount": "100.00",
+                "tradableQuantity": "99.75",
+                "maxSingleTransAmount": "100800",
+                "minSingleTransAmount": "100000"
+            }
+        },
+        {
+            "adv": {
+                "advNo": "12904660381537292288",
+                "classify": "mass",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "1007.900",
+                "surplusAmount": "380.00",
+                "tradableQuantity": "379.05",
+                "maxSingleTransAmount": "400000",
+                "minSingleTransAmount": "378000"
+            }
+        },
+        {
+            "adv": {
+                "advNo": "12948399662619213824",
+                "classify": "mass",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "1007.999",
+                "surplusAmount": "355.46",
+                "tradableQuantity": "354.57",
+                "maxSingleTransAmount": "4000000",
+                "minSingleTransAmount": "20000"
+            }
+        },
+        {
+            "adv": {
+                "advNo": "12929890063862427648",
+                "classify": "mass",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "1008.000",
+                "surplusAmount": "500.00",
+                "tradableQuantity": "498.75",
+                "maxSingleTransAmount": "4000000",
+                "minSingleTransAmount": "310000"
+            }
+        },
+        {
+            "adv": {
+                "advNo": "12929523969990873088",
+                "classify": "mass",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "1008.000",
+                "surplusAmount": "100.00",
+                "tradableQuantity": "99.75",
+                "maxSingleTransAmount": "50000",
+                "minSingleTransAmount": "30000"
+            }
+        },
+        {
+            "adv": {
+                "advNo": "12948770540772311040",
+                "classify": "mass",
+                "tradeType": "SELL",
+                "asset": "USDT",
+                "fiatUnit": "VES",
+                "price": "1008.000",
+                "surplusAmount": "150.00",
+                "tradableQuantity": "149.62",
+                "maxSingleTransAmount": "151200",
+                "minSingleTransAmount": "135000"
+            }
+        }
+    ],
+    "total": 896,
+    "success": true
+}

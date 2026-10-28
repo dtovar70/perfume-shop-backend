@@ -28,6 +28,7 @@ const DATA: PaymentMessageData = {
     totalUsd: 1234.5,
     totalBs: 1054853.41,
     exchangeRate: 854.4637,
+    exchangeRateCurrency: 'USD',
     stockConflict: null,
     payment: {
         reference: '00123456',
@@ -81,9 +82,19 @@ describe('telegram-format', () => {
         expect(text).not.toContain('Perfume 6')
         expect(text).toContain('$1.234,50 · Bs. 1.054.853,41')
         expect(text).toContain('Tasa BCV 854,46')
+        expect(text).not.toContain('854,46 Bs')
         expect(text).toContain('Banco de Venezuela (0102)')
         expect(text).toContain('Fecha: 25/09/2026')
         expect(text).not.toContain('⚠️')
+    })
+
+    it("names the order's rate with its unit when it is not the dollar", () => {
+        expect(paymentMessage({ ...DATA, exchangeRateCurrency: 'EUR' })).toContain(
+            'Tasa BCV (€) 854,46 Bs/€',
+        )
+        expect(paymentMessage({ ...DATA, exchangeRateCurrency: 'USDT' })).toContain(
+            'Tasa USDT Binance 854,46 Bs/USDT',
+        )
     })
 
     it('lists every warning', () => {
@@ -145,6 +156,7 @@ describe('telegram-format', () => {
 
 describe('rate sync alerts', () => {
     const current = {
+        currency: 'USD' as const,
         rate: 36.5,
         source: 'bcv' as const,
         effectiveDate: '2026-09-25',
@@ -154,6 +166,7 @@ describe('rate sync alerts', () => {
 
     it('says both sources failed, the current rate and when orders pause', () => {
         const text = rateSyncFailingMessage({
+            currency: 'USD',
             consecutiveFailures: 3,
             errors: [],
             current,
@@ -164,13 +177,36 @@ describe('rate sync alerts', () => {
         expect(text).toContain('36,5000 Bs/$')
         expect(text).toContain('fecha valor 25/09/2026')
         expect(text).toContain('los pedidos se pausan el 26/09/2026, 12:00 a. m.')
-        expect(text).toContain('Tasa BCV')
+        expect(text).toContain('sección <b>Tasa de cambio</b>')
+    })
+
+    it('names the failing currency and its sources', () => {
+        const text = rateSyncFailingMessage({
+            currency: 'USDT',
+            consecutiveFailures: 6,
+            errors: [{ source: 'binance', error: 'Binance: HTTP 403' }],
+            current: { ...current, currency: 'USDT', rate: 1007.7 },
+            at: '2026-09-25T18:00:00.000Z',
+        })
+        expect(text).toContain('No se pudo obtener la tasa USDT de Binance')
+        expect(text).toContain('Fallaron 6 intentos seguidos (Binance).')
+        expect(text).toContain('1.007,7000 Bs/USDT')
+        const euro = rateSyncRecoveredMessage({
+            currency: 'EUR',
+            outcome: 'stored',
+            failedRuns: 3,
+            current: { ...current, currency: 'EUR', rate: 974.063 },
+            at: '2026-09-25T20:00:00.000Z',
+        })
+        expect(euro).toContain('La tasa del euro BCV se volvió a obtener')
+        expect(euro).toContain('974,0630 Bs/€')
     })
 
     it('says orders are already paused when the rate expired or is missing', () => {
         const at = '2026-09-26T18:00:00.000Z'
         expect(
             rateSyncFailingMessage({
+                currency: 'USD',
                 consecutiveFailures: 3,
                 errors: [],
                 current: { ...current, isStale: true },
@@ -178,12 +214,19 @@ describe('rate sync alerts', () => {
             }),
         ).toContain('Los pedidos ya están pausados')
         expect(
-            rateSyncFailingMessage({ consecutiveFailures: 3, errors: [], current: null, at }),
+            rateSyncFailingMessage({
+                currency: 'USD',
+                consecutiveFailures: 3,
+                errors: [],
+                current: null,
+                at,
+            }),
         ).toContain('Todavía no hay ninguna tasa guardada')
     })
 
     it('announces the recovery with the rate in use', () => {
         const text = rateSyncRecoveredMessage({
+            currency: 'USD',
             outcome: 'stored',
             failedRuns: 3,
             current,

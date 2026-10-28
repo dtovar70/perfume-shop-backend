@@ -1,6 +1,7 @@
 import { formatCaracasDateTime, formatDay } from '../../common/utils/caracas-date.js'
 import { formatBs, formatUsd, formatVeNumber } from '../../common/utils/money-format.js'
 import type { ContactContent, PaymentContent } from '../../content/content.types.js'
+import { RATE_NAMES, RATE_UNITS } from '../../exchange-rate/rate-currency.js'
 import { renderEmail, type EmailBlock, type EmailInline } from '../../mail/email-layout.js'
 import type { OrderItem } from '../entities/order-item.entity.js'
 import type { Order } from '../entities/order.entity.js'
@@ -31,6 +32,7 @@ export type OrderReceivedData = Pick<
     | 'totalUsd'
     | 'totalBs'
     | 'exchangeRate'
+    | 'exchangeRateCurrency'
     | 'exchangeRateDate'
     | 'paymentDueAt'
 > & {
@@ -130,6 +132,7 @@ export function orderReceivedEmail(
     shop: OrderEmailShop,
 ): OrderEmail {
     const deadline = formatCaracasDateTime(order.paymentDueAt)
+    const currency = order.exchangeRateCurrency ?? 'USD'
     const shipping =
         order.deliveryMethod === 'pickup'
             ? 'Sin costo (retiro)'
@@ -155,8 +158,8 @@ export function orderReceivedEmail(
                 { label: 'Total', value: formatUsd(order.totalUsd), strong: true },
                 { label: 'Total en bolívares', value: formatBs(order.totalBs), strong: true },
                 {
-                    label: `Tasa BCV del ${formatDay(order.exchangeRateDate)}`,
-                    value: `${formatVeNumber(order.exchangeRate, 4)} Bs/$`,
+                    label: `${RATE_NAMES[currency]} del ${formatDay(order.exchangeRateDate)}`,
+                    value: `${formatVeNumber(order.exchangeRate, 4)} ${RATE_UNITS[currency]}`,
                 },
             ],
         },
